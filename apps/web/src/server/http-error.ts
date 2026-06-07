@@ -19,9 +19,15 @@ export async function parseJsonBody(request: Request): Promise<unknown> {
 
 export function toErrorResponse(error: unknown) {
   if (error instanceof ApiError) {
-    return NextResponse.json({ message: error.message }, { status: error.status });
+    return NextResponse.json(
+      { message: error.message },
+      { status: error.status },
+    );
   }
 
   console.error(error);
-  return NextResponse.json({ message: "Internal server error." }, { status: 500 });
+  return NextResponse.json(
+    { message: "Internal server error." },
+    { status: 500 },
+  );
 }

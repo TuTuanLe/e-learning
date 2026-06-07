@@ -2,7 +2,7 @@ import type { AuthUser } from "@dictation/contracts";
 import {
   createClient,
   type SupabaseClient,
-  type User
+  type User,
 } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import { ApiError } from "@/server/http-error";
@@ -50,7 +50,7 @@ async function verifyAccessToken(accessToken: string): Promise<AuthUser> {
       pruneTokenCache();
       verifiedTokens.set(tokenKey, {
         user,
-        expiresAt: Date.now() + TOKEN_CACHE_TTL_MS
+        expiresAt: Date.now() + TOKEN_CACHE_TTL_MS,
       });
 
       return user;
@@ -69,8 +69,10 @@ function getSupabase(): SupabaseClient {
     return supabase;
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl =
+    process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey =
+    process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new ApiError(401, "Supabase Auth is not configured");
@@ -79,8 +81,8 @@ function getSupabase(): SupabaseClient {
   supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
-      autoRefreshToken: false
-    }
+      autoRefreshToken: false,
+    },
   });
 
   return supabase;
@@ -125,11 +127,14 @@ function toAuthUser(user: User): AuthUser {
       getStringMetadata(user.user_metadata, "full_name"),
     avatarUrl:
       getStringMetadata(user.user_metadata, "avatar_url") ??
-      getStringMetadata(user.user_metadata, "picture")
+      getStringMetadata(user.user_metadata, "picture"),
   };
 }
 
-function getStringMetadata(metadata: User["user_metadata"], key: string): string | null {
+function getStringMetadata(
+  metadata: User["user_metadata"],
+  key: string,
+): string | null {
   const value: unknown =
     typeof metadata === "object" && metadata !== null
       ? (metadata as Record<string, unknown>)[key]

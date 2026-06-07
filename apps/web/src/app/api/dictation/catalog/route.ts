@@ -13,7 +13,7 @@ export async function GET() {
     const catalog = await getCachedJson<DictationCatalogResponse>(
       CATALOG_CACHE_KEY,
       CATALOG_CACHE_TTL_SECONDS,
-      () => dictationService.getCatalog()
+      () => dictationService.getCatalog(),
     );
     return NextResponse.json(catalog);
   } catch (error) {

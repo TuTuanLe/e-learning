@@ -3,21 +3,21 @@ import type {
   DictationCatalogResponse,
   DictationCurrentQuestion,
   DictationMode,
-  DictationSessionResponse
+  DictationSessionResponse,
 } from "@dictation/contracts";
 import { Prisma, type DictationSession } from "@prisma/client";
 import { ApiError } from "@/server/http-error";
 import { prisma } from "@/server/prisma";
 import {
   assertAiPlannerAccess,
-  assertUnitAccess
+  assertUnitAccess,
 } from "@/server/billing/subscription-service";
 import {
   dictationCollections,
   findDictationCollection,
   findDictationQuestion,
   findDictationUnit,
-  type DictationQuestion
+  type DictationQuestion,
 } from "./dictation.data";
 
 type StudyPlanContext = {
@@ -46,7 +46,7 @@ function parseBoundedString(
   body: Record<string, unknown>,
   key: string,
   maximumLength: number,
-  allowEmpty = false
+  allowEmpty = false,
 ): string {
   const value = body[key];
 
@@ -77,7 +77,7 @@ function parseCreateSession(body: unknown): ParsedCreateSession {
   return {
     collectionId: parseBoundedString(body, "collectionId", 80),
     unitId: parseBoundedString(body, "unitId", 80),
-    mode
+    mode,
   };
 }
 
@@ -95,13 +95,16 @@ function parseSubmitAnswer(body: unknown): ParsedSubmitAnswer {
       elapsedMs < 0 ||
       elapsedMs > 3_600_000)
   ) {
-    throw new ApiError(400, "elapsedMs must be an integer between 0 and 3600000.");
+    throw new ApiError(
+      400,
+      "elapsedMs must be an integer between 0 and 3600000.",
+    );
   }
 
   return {
     questionId: parseBoundedString(body, "questionId", 120),
     answer: parseBoundedString(body, "answer", 500, true),
-    ...(elapsedMs === undefined ? {} : { elapsedMs })
+    ...(elapsedMs === undefined ? {} : { elapsedMs }),
   };
 }
 
@@ -136,7 +139,7 @@ function buildWordBank(question: DictationQuestion, seed: string): string[] {
   return question.segments
     .map((segment, index) => ({
       segment,
-      rank: hashText(`${seed}:${question.id}:${index}:${segment}`)
+      rank: hashText(`${seed}:${question.id}:${index}:${segment}`),
     }))
     .sort((left, right) => left.rank - right.rank)
     .map(({ segment }) => segment);
@@ -158,12 +161,15 @@ function normalizePinyin(value: string): string {
     .replace(/[^a-z]/g, "");
 }
 
-async function findOwnedSession(userId: string, id: string): Promise<DictationSession> {
+async function findOwnedSession(
+  userId: string,
+  id: string,
+): Promise<DictationSession> {
   const session = await prisma.dictationSession.findFirst({
     where: {
       id,
-      userId
-    }
+      userId,
+    },
   });
 
   if (!session) {
@@ -175,7 +181,7 @@ async function findOwnedSession(userId: string, id: string): Promise<DictationSe
 
 function toSessionResponse(
   session: DictationSession,
-  studyPlan: StudyPlanContext | null = null
+  studyPlan: StudyPlanContext | null = null,
 ): DictationSessionResponse {
   const collection = findDictationCollection(session.collectionId);
   const unit = findDictationUnit(session.collectionId, session.unitId);
@@ -198,7 +204,7 @@ function toSessionResponse(
         audioText: question.hanzi,
         wordBank: buildWordBank(question, session.id),
         targetSeconds: question.targetSeconds,
-        hint: `Câu có ${Array.from(question.hanzi).filter((char) => /[\u3400-\u9fff]/u.test(char)).length} chữ Hán, bắt đầu bằng “${question.hanzi[0] ?? ""}”.`
+        hint: `Câu có ${Array.from(question.hanzi).filter((char) => /[\u3400-\u9fff]/u.test(char)).length} chữ Hán, bắt đầu bằng “${question.hanzi[0] ?? ""}”.`,
       }
     : null;
 
@@ -207,11 +213,11 @@ function toSessionResponse(
     collection: {
       id: collection.id,
       title: collection.title,
-      hskLevel: collection.hskLevel
+      hskLevel: collection.hskLevel,
     },
     unit: {
       id: unit.id,
-      title: unit.title
+      title: unit.title,
     },
     mode: session.mode,
     status: session.status,
@@ -228,7 +234,7 @@ function toSessionResponse(
     studyPlan,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
-    completedAt: session.completedAt
+    completedAt: session.completedAt,
   };
 }
 
@@ -247,13 +253,15 @@ export const dictationService = {
           description: unit.description,
           topic: unit.topic ?? getDefaultTopic(unit.id),
           questionCount: unit.questions.length,
-          estimatedMinutes: unit.estimatedMinutes
-        }))
-      }))
+          estimatedMinutes: unit.estimatedMinutes,
+        })),
+      })),
     };
   },
 
-  async listSessions(userId: string): Promise<{ sessions: DictationSessionResponse[] }> {
+  async listSessions(
+    userId: string,
+  ): Promise<{ sessions: DictationSessionResponse[] }> {
     const sessions = await prisma.dictationSession.findMany({
       where: { userId },
       include: {
@@ -263,24 +271,27 @@ export const dictationService = {
             title: true,
             week: {
               select: {
-                studyPlan: { select: { hskLevel: true } }
-              }
-            }
-          }
-        }
+                studyPlan: { select: { hskLevel: true } },
+              },
+            },
+          },
+        },
       },
       orderBy: { updatedAt: "desc" },
-      take: 20
+      take: 20,
     });
 
     return {
       sessions: sessions.map((session) =>
-        toSessionResponse(session, toStudyPlanContext(session.studyPlanLesson))
-      )
+        toSessionResponse(session, toStudyPlanContext(session.studyPlanLesson)),
+      ),
     };
   },
 
-  async createSession(userId: string, body: unknown): Promise<DictationSessionResponse> {
+  async createSession(
+    userId: string,
+    body: unknown,
+  ): Promise<DictationSessionResponse> {
     const parsed = parseCreateSession(body);
 
     const collection = findDictationCollection(parsed.collectionId);
@@ -299,8 +310,8 @@ export const dictationService = {
         unitId: unit.id,
         mode: parsed.mode,
         questionOrder: shuffle(unit.questions.map((question) => question.id)),
-        completedQuestionIds: []
-      }
+        completedQuestionIds: [],
+      },
     });
 
     return toSessionResponse(session);
@@ -309,43 +320,51 @@ export const dictationService = {
   async createStudyPlanSession(
     userId: string,
     hskLevel: number,
-    lessonId: string
+    lessonId: string,
   ): Promise<DictationSessionResponse> {
     await assertAiPlannerAccess(userId);
     const lesson = await prisma.hskStudyPlanLesson.findFirst({
       where: {
         id: lessonId,
-        week: { studyPlan: { userId, hskLevel } }
+        week: { studyPlan: { userId, hskLevel } },
       },
       include: {
         week: {
           select: {
-            studyPlan: { select: { hskLevel: true } }
-          }
+            studyPlan: { select: { hskLevel: true } },
+          },
         },
         sessions: {
           where: { status: "ACTIVE" },
           orderBy: { createdAt: "desc" },
-          take: 1
-        }
-      }
+          take: 1,
+        },
+      },
     });
 
-    if (!lesson) throw new ApiError(404, "Không tìm thấy bài học trong lộ trình.");
+    if (!lesson)
+      throw new ApiError(404, "Không tìm thấy bài học trong lộ trình.");
     if (lesson.status === "LOCKED") {
-      throw new ApiError(409, "Hãy hoàn thành bài học trước đó để mở khóa bài này.");
+      throw new ApiError(
+        409,
+        "Hãy hoàn thành bài học trước đó để mở khóa bài này.",
+      );
     }
 
     const activeSession = lesson.sessions[0];
     const studyPlan = {
       hskLevel: lesson.week.studyPlan.hskLevel,
       lessonId: lesson.id,
-      lessonTitle: lesson.title
+      lessonTitle: lesson.title,
     };
     if (activeSession) return toSessionResponse(activeSession, studyPlan);
 
     const unit = findDictationUnit(lesson.collectionId, lesson.unitId);
-    if (!unit) throw new ApiError(404, "Nội dung dictation của bài học không còn tồn tại.");
+    if (!unit)
+      throw new ApiError(
+        404,
+        "Nội dung dictation của bài học không còn tồn tại.",
+      );
 
     let session: DictationSession;
 
@@ -357,23 +376,28 @@ export const dictationService = {
             collectionId: lesson.collectionId,
             unitId: lesson.unitId,
             mode: lesson.mode,
-            questionOrder: shuffle(unit.questions.map((question) => question.id)),
+            questionOrder: shuffle(
+              unit.questions.map((question) => question.id),
+            ),
             completedQuestionIds: [],
-            studyPlanLessonId: lesson.id
-          }
+            studyPlanLessonId: lesson.id,
+          },
         });
 
         if (lesson.status !== "COMPLETED") {
           await transaction.hskStudyPlanLesson.update({
             where: { id: lesson.id },
-            data: { status: "IN_PROGRESS" }
+            data: { status: "IN_PROGRESS" },
           });
         }
 
         return created;
       });
     } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== "P2002"
+      ) {
         throw error;
       }
 
@@ -381,9 +405,9 @@ export const dictationService = {
         where: {
           userId,
           studyPlanLessonId: lesson.id,
-          status: "ACTIVE"
+          status: "ACTIVE",
         },
-        orderBy: { createdAt: "desc" }
+        orderBy: { createdAt: "desc" },
       });
 
       if (!concurrentSession) throw error;
@@ -393,16 +417,22 @@ export const dictationService = {
     return toSessionResponse(session, studyPlan);
   },
 
-  async getSession(userId: string, id: string): Promise<DictationSessionResponse> {
+  async getSession(
+    userId: string,
+    id: string,
+  ): Promise<DictationSessionResponse> {
     const session = await findOwnedSession(userId, id);
 
-    return toSessionResponse(session, await getStudyPlanContext(session.studyPlanLessonId));
+    return toSessionResponse(
+      session,
+      await getStudyPlanContext(session.studyPlanLessonId),
+    );
   },
 
   async submitAnswer(
     userId: string,
     id: string,
-    body: unknown
+    body: unknown,
   ): Promise<DictationAnswerResponse> {
     const parsed = parseSubmitAnswer(body);
     const session = await findOwnedSession(userId, id);
@@ -448,8 +478,8 @@ export const dictationService = {
           answer: submittedAnswer,
           isCorrect: correct,
           elapsedMs,
-          expDelta
-        }
+          expDelta,
+        },
       });
 
       const updatedSession = await transaction.dictationSession.update({
@@ -464,8 +494,8 @@ export const dictationService = {
           correctCount: session.correctCount + (correct ? 1 : 0),
           mistakeCount: session.mistakeCount + (correct ? 0 : 1),
           status: completed ? "COMPLETED" : "ACTIVE",
-          completedAt: completed ? new Date() : null
-        }
+          completedAt: completed ? new Date() : null,
+        },
       });
 
       if (completed && session.studyPlanLessonId) {
@@ -481,14 +511,14 @@ export const dictationService = {
       answer: {
         hanzi: question.hanzi,
         pinyin: question.pinyin,
-        meaningVi: question.promptVi
+        meaningVi: question.promptVi,
       },
       session: toSessionResponse(
         nextSession,
-        await getStudyPlanContext(nextSession.studyPlanLessonId)
-      )
+        await getStudyPlanContext(nextSession.studyPlanLessonId),
+      ),
     };
-  }
+  },
 };
 
 function toStudyPlanContext(
@@ -496,19 +526,19 @@ function toStudyPlanContext(
     id: string;
     title: string;
     week: { studyPlan: { hskLevel: number } };
-  } | null
+  } | null,
 ): StudyPlanContext | null {
   return lesson
     ? {
         hskLevel: lesson.week.studyPlan.hskLevel,
         lessonId: lesson.id,
-        lessonTitle: lesson.title
+        lessonTitle: lesson.title,
       }
     : null;
 }
 
 async function getStudyPlanContext(
-  lessonId: string | null
+  lessonId: string | null,
 ): Promise<StudyPlanContext | null> {
   if (!lessonId) return null;
 
@@ -519,10 +549,10 @@ async function getStudyPlanContext(
       title: true,
       week: {
         select: {
-          studyPlan: { select: { hskLevel: true } }
-        }
-      }
-    }
+          studyPlan: { select: { hskLevel: true } },
+        },
+      },
+    },
   });
 
   return toStudyPlanContext(lesson);
@@ -530,45 +560,51 @@ async function getStudyPlanContext(
 
 async function completeStudyPlanLesson(
   transaction: Prisma.TransactionClient,
-  lessonId: string
+  lessonId: string,
 ): Promise<void> {
   const lesson = await transaction.hskStudyPlanLesson.findUnique({
     where: { id: lessonId },
-    include: { week: true }
+    include: { week: true },
   });
 
   if (!lesson || lesson.status === "COMPLETED") return;
 
   await transaction.hskStudyPlanLesson.update({
     where: { id: lesson.id },
-    data: { status: "COMPLETED", completedAt: new Date() }
+    data: { status: "COMPLETED", completedAt: new Date() },
   });
 
   const remaining = await transaction.hskStudyPlanLesson.findMany({
     where: {
       week: { studyPlanId: lesson.week.studyPlanId },
       id: { not: lesson.id },
-      status: { not: "COMPLETED" }
+      status: { not: "COMPLETED" },
     },
-    include: { week: { select: { weekNumber: true } } }
+    include: { week: { select: { weekNumber: true } } },
   });
   const nextLesson = remaining.sort(
     (left, right) =>
       left.week.weekNumber - right.week.weekNumber ||
-      left.position - right.position
+      left.position - right.position,
   )[0];
 
   if (nextLesson) {
     await transaction.hskStudyPlanLesson.update({
       where: { id: nextLesson.id },
-      data: { status: "AVAILABLE" }
+      data: { status: "AVAILABLE" },
     });
   }
 }
 
 function getDefaultTopic(unitId: string): string {
-  if (unitId.includes("greetings") || unitId.includes("communication")) return "Giao tiếp";
-  if (unitId.includes("daily") || unitId.includes("life") || unitId.includes("growth")) return "Đời sống";
+  if (unitId.includes("greetings") || unitId.includes("communication"))
+    return "Giao tiếp";
+  if (
+    unitId.includes("daily") ||
+    unitId.includes("life") ||
+    unitId.includes("growth")
+  )
+    return "Đời sống";
   if (unitId.includes("family")) return "Gia đình";
   if (unitId.includes("time")) return "Lịch trình";
   if (unitId.includes("study") || unitId.includes("thinking")) return "Học tập";

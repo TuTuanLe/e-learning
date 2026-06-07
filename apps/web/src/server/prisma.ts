@@ -8,7 +8,7 @@ function createPrismaClient() {
   const datasourceUrl =
     process.env.NODE_ENV === "production"
       ? process.env.DATABASE_URL
-      : process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+      : (process.env.DIRECT_URL ?? process.env.DATABASE_URL);
 
   if (datasourceUrl) {
     return new PrismaClient({ datasourceUrl });

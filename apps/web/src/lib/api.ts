@@ -12,19 +12,23 @@ import type {
   StudyPlanResponse,
   SubscriptionPlan,
   SubscriptionSummary,
-  SubmitDictationAnswerRequest
+  SubmitDictationAnswerRequest,
 } from "@dictation/contracts";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
-async function request<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
+async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  token?: string,
+): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init.headers
-    }
+      ...init.headers,
+    },
   });
   const payload = await response.json().catch(() => null);
 
@@ -43,7 +47,7 @@ export const dictationApi = {
     request<DictationSessionResponse>(
       "/dictation/sessions",
       { method: "POST", body: JSON.stringify(payload) },
-      token
+      token,
     ),
   session: (id: string, token: string) =>
     request<DictationSessionResponse>(`/dictation/sessions/${id}`, {}, token),
@@ -51,8 +55,8 @@ export const dictationApi = {
     request<DictationAnswerResponse>(
       `/dictation/sessions/${id}/answers`,
       { method: "POST", body: JSON.stringify(payload) },
-      token
-  )
+      token,
+    ),
 };
 
 export const subscriptionApi = {
@@ -62,15 +66,15 @@ export const subscriptionApi = {
     request<CheckoutResponse>(
       "/subscription/checkout",
       { method: "POST", body: JSON.stringify({ plan }) },
-      token
+      token,
     ),
   portal: (token: string) =>
-    request<{ url: string }>("/subscription/portal", { method: "POST" }, token)
+    request<{ url: string }>("/subscription/portal", { method: "POST" }, token),
 };
 
 export const paymentApi = {
   order: (invoice: string) =>
-    request<PaymentOrderResponse>(`/payment/orders/${invoice}`)
+    request<PaymentOrderResponse>(`/payment/orders/${invoice}`),
 };
 
 export const adminApi = {
@@ -80,8 +84,8 @@ export const adminApi = {
     request<PaymentOrderResponse>(
       `/admin/orders/${id}/activate`,
       { method: "POST" },
-      token
-    )
+      token,
+    ),
 };
 
 export const studyPlanApi = {
@@ -91,12 +95,12 @@ export const studyPlanApi = {
     request<StudyPlanResponse>(
       "/study-plan",
       { method: "POST", body: JSON.stringify(intake) },
-      token
+      token,
     ),
   startLesson: (hskLevel: number, lessonId: string, token: string) =>
     request<DictationSessionResponse>(
       `/study-plan/${hskLevel}/lessons/${lessonId}/start`,
       { method: "POST" },
-      token
-    )
+      token,
+    ),
 };
