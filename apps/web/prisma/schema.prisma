@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum DictationMode {
+  TYPING
+  WORD_BANK
+}
+
+enum DictationSessionStatus {
+  ACTIVE
+  COMPLETED
+}
+
+enum SubscriptionPlan {
+  MONTHLY
+  SIX_MONTH
+  ANNUAL
+  LIFETIME
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+}
+
+enum PaymentOrderStatus {
+  PENDING
+  PAID
+  ACTIVATED
+  CANCELED
+  FAILED
+}
+
+enum StudyPlanLessonStatus {
+  LOCKED
+  AVAILABLE
+  IN_PROGRESS
+  COMPLETED
+}
+
+model DictationSession {
+  id                   String                 @id @default(uuid()) @db.Uuid
+  userId               String                 @db.Uuid
+  collectionId         String
+  unitId               String
+  mode                 DictationMode
+  status               DictationSessionStatus @default(ACTIVE)
+  questionOrder        Json
+  completedQuestionIds Json
+  currentIndex         Int                    @default(0)
+  exp                  Int                    @default(0)
+  combo                Int                    @default(0)
+  maxCombo             Int                    @default(0)
+  correctCount         Int                    @default(0)
+  mistakeCount         Int                    @default(0)
+  completedAt          DateTime?
+  studyPlanLessonId    String?                @db.Uuid
+  studyPlanLesson      HskStudyPlanLesson?    @relation(fields: [studyPlanLessonId], references: [id], onDelete: SetNull)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  attempts             DictationAttempt[]
+
+  @@index([userId, createdAt])
+  @@index([studyPlanLessonId, status])
+  @@map("dictation_sessions")
+}
+
+model DictationAttempt {
+  id         String           @id @default(uuid()) @db.Uuid
+  sessionId  String           @db.Uuid
+  session    DictationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId String
+  answer     String
+  isCorrect  Boolean
+  elapsedMs  Int
+  expDelta   Int
+  createdAt  DateTime         @default(now())
+
+  @@index([sessionId, createdAt])
+  @@map("dictation_attempts")
+}
+
+model UserSubscription {
+  id                   String             @id @default(uuid()) @db.Uuid
+  userId               String             @unique @db.Uuid
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  plan                 SubscriptionPlan
+  status               SubscriptionStatus @default(INCOMPLETE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([status, currentPeriodEnd])
+  @@map("user_subscriptions")
+}
+
+model PaymentOrder {
+  id            String             @id @default(uuid()) @db.Uuid
+  userId        String             @db.Uuid
+  userEmail     String
+  plan          SubscriptionPlan
+  status        PaymentOrderStatus @default(PENDING)
+  invoiceNumber String             @unique
+  amount        Int
+  currency      String             @default("VND")
+  description   String
+  paymentMethod String             @default("BANK_TRANSFER")
+  activatedAt   DateTime?
+  activatedBy   String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@map("payment_orders")
+}
+
+model AiStudyPlan {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  intake    Json
+  plan      Json
+  model     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@map("ai_study_plans")
+}
+
+model HskStudyPlan {
+  id            String             @id @default(uuid()) @db.Uuid
+  userId        String             @db.Uuid
+  hskLevel      Int
+  intake        Json
+  title         String
+  summary       String
+  durationWeeks Int
+  weeklyMinutes Int
+  strategy      Json
+  model         String
+  version       Int                @default(1)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  weeks         HskStudyPlanWeek[]
+
+  @@unique([userId, hskLevel])
+  @@index([userId, updatedAt])
+  @@map("hsk_study_plans")
+}
+
+model HskStudyPlanWeek {
+  id          String               @id @default(uuid()) @db.Uuid
+  studyPlanId String               @db.Uuid
+  studyPlan   HskStudyPlan         @relation(fields: [studyPlanId], references: [id], onDelete: Cascade)
+  weekNumber  Int
+  title       String
+  objective   String
+  milestone   String
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  lessons     HskStudyPlanLesson[]
+
+  @@unique([studyPlanId, weekNumber])
+  @@index([studyPlanId, weekNumber])
+  @@map("hsk_study_plan_weeks")
+}
+
+model HskStudyPlanLesson {
+  id               String                @id @default(uuid()) @db.Uuid
+  weekId           String                @db.Uuid
+  week             HskStudyPlanWeek      @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  position         Int
+  title            String
+  description      String
+  topic            String
+  activities       Json
+  collectionId     String
+  unitId           String
+  mode             DictationMode
+  estimatedMinutes Int
+  status           StudyPlanLessonStatus @default(LOCKED)
+  completedAt      DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  sessions         DictationSession[]
+
+  @@unique([weekId, position])
+  @@index([weekId, status, position])
+  @@map("hsk_study_plan_lessons")
+}
