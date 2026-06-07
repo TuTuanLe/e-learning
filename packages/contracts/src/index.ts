@@ -136,6 +136,7 @@ export type CheckoutResponse = {
 export type PaymentOrderStatus =
   | "PENDING"
   | "PAID"
+  | "TRIALING"
   | "ACTIVATED"
   | "CANCELED"
   | "FAILED";

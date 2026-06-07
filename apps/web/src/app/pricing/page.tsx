@@ -67,7 +67,6 @@ const sharedFeatures = [
 export default function PricingPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [summary, setSummary] = useState<SubscriptionSummary | null>(null);
-  console.log("🚀 ~ PricingPage ~ summary:", summary);
   const [loadingPlan, setLoadingPlan] = useState<SubscriptionPlan | null>(null);
   const [error, setError] = useState("");
 
@@ -140,7 +139,8 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {summary?.plan && summary.status === "ACTIVE" ? (
+        {summary?.plan &&
+        (summary.status === "ACTIVE" || summary.status === "TRIALING") ? (
           <div className="mx-auto mt-8 flex max-w-3xl flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/25 bg-blue-50 p-4">
             <p className="text-sm">
               Gói hiện tại: <strong>{planLabel(summary.plan)}</strong>
@@ -157,7 +157,7 @@ export default function PricingPage() {
               </button>
             ) : (
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">
-                {summary.status === "TRIALING"
+                {summary?.status === "TRIALING"
                   ? "Trial 2 tuần"
                   : "SePay / local"}
               </span>
