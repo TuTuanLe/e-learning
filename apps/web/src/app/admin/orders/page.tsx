@@ -22,7 +22,9 @@ export default function AdminOrdersPage() {
       const { data } = await supabase.auth.getSession();
       const accessToken = data.session?.access_token;
       if (!accessToken) {
-        window.location.assign(`/login?next=${encodeURIComponent("/admin/orders")}`);
+        window.location.assign(
+          `/login?next=${encodeURIComponent("/admin/orders")}`,
+        );
         return;
       }
 
@@ -32,7 +34,9 @@ export default function AdminOrdersPage() {
         if (mounted) setOrders(response.orders);
       } catch (caught) {
         if (mounted) {
-          setError(caught instanceof Error ? caught.message : "Không thể tải orders.");
+          setError(
+            caught instanceof Error ? caught.message : "Không thể tải orders.",
+          );
         }
       } finally {
         if (mounted) setLoading(false);
@@ -51,10 +55,12 @@ export default function AdminOrdersPage() {
     try {
       const updated = await adminApi.activateOrder(order.id, token);
       setOrders((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item))
+        current.map((item) => (item.id === updated.id ? updated : item)),
       );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Không thể kích hoạt order.");
+      setError(
+        caught instanceof Error ? caught.message : "Không thể kích hoạt order.",
+      );
     } finally {
       setActivatingId(null);
     }
@@ -69,7 +75,9 @@ export default function AdminOrdersPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
               Admin
             </p>
-            <h1 className="mt-2 text-4xl font-bold tracking-[-1px]">Orders SePay</h1>
+            <h1 className="mt-2 text-4xl font-bold tracking-[-1px]">
+              Orders SePay
+            </h1>
           </div>
           <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-white px-4 py-2 text-sm font-semibold">
             <ShieldCheck className="size-4 text-primary" />
@@ -77,7 +85,11 @@ export default function AdminOrdersPage() {
           </span>
         </div>
 
-        {error ? <p className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p> : null}
+        {error ? (
+          <p className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </p>
+        ) : null}
 
         <div className="mt-6 overflow-hidden rounded-2xl border border-hairline bg-white notion-shadow">
           <div className="grid grid-cols-[1.1fr_1fr_0.7fr_0.7fr_0.8fr_0.7fr] gap-4 border-b border-hairline bg-canvas-soft px-5 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted">
@@ -94,7 +106,9 @@ export default function AdminOrdersPage() {
               Đang tải orders...
             </div>
           ) : orders.length === 0 ? (
-            <p className="p-10 text-center text-sm text-ink-muted">Chưa có order nào.</p>
+            <p className="p-10 text-center text-sm text-ink-muted">
+              Chưa có order nào.
+            </p>
           ) : (
             orders.map((order) => (
               <div
@@ -116,7 +130,9 @@ export default function AdminOrdersPage() {
                 <div className="text-right">
                   <button
                     className="focus-ring inline-flex h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-canvas-soft disabled:text-ink-muted"
-                    disabled={order.status === "ACTIVATED" || activatingId !== null}
+                    disabled={
+                      order.status === "ACTIVATED" || activatingId !== null
+                    }
                     onClick={() => void activate(order)}
                   >
                     {activatingId === order.id ? (
