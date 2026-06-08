@@ -72,6 +72,14 @@ export const subscriptionApi = {
     request<{ url: string }>("/subscription/portal", { method: "POST" }, token),
 };
 
+export const accountApi = {
+  learning: (token: string) =>
+    request<{
+      subscription: SubscriptionSummary;
+      studyPlans: StudyPlanResponse[];
+    }>("/account/learning", {}, token),
+};
+
 export const paymentApi = {
   order: (invoice: string) =>
     request<PaymentOrderResponse>(`/payment/orders/${invoice}`),

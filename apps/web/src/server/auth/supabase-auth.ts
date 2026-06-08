@@ -4,7 +4,7 @@ import {
   type SupabaseClient,
   type User,
 } from "@supabase/supabase-js";
-import { createHash } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { ApiError } from "@/server/http-error";
 
 const TOKEN_CACHE_TTL_MS = 30_000;
@@ -45,7 +45,9 @@ async function verifyAccessToken(accessToken: string): Promise<AuthUser> {
     return pending;
   }
 
-  const verification = verifyTokenRemotely(accessToken)
+  const verification = Promise.resolve(
+    verifyAccessTokenLocally(accessToken) ?? verifyTokenRemotely(accessToken),
+  )
     .then((user) => {
       pruneTokenCache();
       verifiedTokens.set(tokenKey, {
@@ -62,6 +64,69 @@ async function verifyAccessToken(accessToken: string): Promise<AuthUser> {
   pendingVerifications.set(tokenKey, verification);
 
   return verification;
+}
+
+function verifyAccessTokenLocally(accessToken: string): AuthUser | null {
+  const jwtSecret =
+    process.env.SUPABASE_JWT_SECRET ?? process.env.SUPABASE_AUTH_JWT_SECRET;
+
+  if (!jwtSecret) {
+    return null;
+  }
+
+  const [encodedHeader, encodedPayload, encodedSignature] =
+    accessToken.split(".");
+
+  if (!encodedHeader || !encodedPayload || !encodedSignature) {
+    return null;
+  }
+
+  const header = parseJwtPart(encodedHeader);
+  const payload = parseJwtPart(encodedPayload);
+
+  if (!isRecord(header) || header.alg !== "HS256" || !isRecord(payload)) {
+    return null;
+  }
+
+  const expectedSignature = createHmac("sha256", jwtSecret)
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest();
+  const actualSignature = base64UrlToBuffer(encodedSignature);
+
+  if (
+    actualSignature.length !== expectedSignature.length ||
+    !timingSafeEqual(actualSignature, expectedSignature)
+  ) {
+    return null;
+  }
+
+  const nowInSeconds = Math.floor(Date.now() / 1000);
+  const expiresAt = getNumericClaim(payload, "exp");
+  const notBefore = getNumericClaim(payload, "nbf");
+  const userId = getStringClaim(payload, "sub");
+  const email = getStringClaim(payload, "email");
+
+  if (
+    !userId ||
+    !email ||
+    (expiresAt !== null && expiresAt <= nowInSeconds) ||
+    (notBefore !== null && notBefore > nowInSeconds)
+  ) {
+    return null;
+  }
+
+  const metadata = getRecordClaim(payload, "user_metadata");
+
+  return {
+    id: userId,
+    email,
+    name:
+      getStringMetadata(metadata, "name") ??
+      getStringMetadata(metadata, "full_name"),
+    avatarUrl:
+      getStringMetadata(metadata, "avatar_url") ??
+      getStringMetadata(metadata, "picture"),
+  };
 }
 
 function getSupabase(): SupabaseClient {
@@ -132,7 +197,7 @@ function toAuthUser(user: User): AuthUser {
 }
 
 function getStringMetadata(
-  metadata: User["user_metadata"],
+  metadata: Record<string, unknown> | null | undefined,
   key: string,
 ): string | null {
   const value: unknown =
@@ -141,6 +206,49 @@ function getStringMetadata(
       : undefined;
 
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function parseJwtPart(value: string): unknown {
+  try {
+    return JSON.parse(base64UrlToBuffer(value).toString("utf8")) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function base64UrlToBuffer(value: string): Buffer {
+  return Buffer.from(value, "base64url");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function getStringClaim(
+  payload: Record<string, unknown>,
+  key: string,
+): string | null {
+  const value = payload[key];
+
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function getNumericClaim(
+  payload: Record<string, unknown>,
+  key: string,
+): number | null {
+  const value = payload[key];
+
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function getRecordClaim(
+  payload: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> | null {
+  const value = payload[key];
+
+  return isRecord(value) ? value : null;
 }
 
 function getBearerToken(authorization: string | null): string | null {

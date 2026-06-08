@@ -30,7 +30,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { ActiveSessionCard } from "@/components/active-session-card";
 import { AppHeader } from "@/components/app-header";
-import { dictationApi, studyPlanApi, subscriptionApi } from "@/lib/api";
+import { accountApi, dictationApi, studyPlanApi } from "@/lib/api";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 
 const coverByCollection: Record<string, string> = {
@@ -97,19 +97,20 @@ export default function HomePage() {
         return;
       }
 
-      const [recent, nextSubscription, roadmaps] = await Promise.all([
+      const [recent, learning] = await Promise.all([
         dictationApi.sessions(accessToken).catch(() => ({ sessions: [] })),
-        subscriptionApi.summary(accessToken).catch(() => null),
-        studyPlanApi.list(accessToken).catch(() => ({ studyPlans: [] })),
+        accountApi
+          .learning(accessToken)
+          .catch(() => ({ subscription: null, studyPlans: [] })),
       ]);
 
       if (!mounted || accessToken !== loadedAccessToken) return;
 
       setSessions(recent.sessions);
-      setSubscription(nextSubscription);
+      setSubscription(learning.subscription);
       setActiveRoadmap(
-        roadmaps.studyPlans.find((plan) => plan.nextLesson) ??
-          roadmaps.studyPlans[0] ??
+        learning.studyPlans.find((plan) => plan.nextLesson) ??
+          learning.studyPlans[0] ??
           null,
       );
     }

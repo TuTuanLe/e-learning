@@ -13,7 +13,7 @@ import { CheckCircle2, LockKeyhole, Plus, Sparkles } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { RoadmapDashboard } from "@/components/study-plan/roadmap-dashboard";
 import { RoadmapForm } from "@/components/study-plan/roadmap-form";
-import { studyPlanApi, subscriptionApi } from "@/lib/api";
+import { accountApi, studyPlanApi } from "@/lib/api";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 
 const HSK_LEVELS = [1, 2, 3, 4, 5, 6] as const;
@@ -53,37 +53,21 @@ export default function StudyPlanPage() {
       }
 
       try {
-        const [subscriptionResult, plansResult] = await Promise.allSettled([
-          subscriptionApi.summary(accessToken),
-          studyPlanApi.list(accessToken)
-        ]);
+        const learning = await accountApi.learning(accessToken);
         if (!mounted || accessToken !== loadedAccessToken) return;
 
-        if (subscriptionResult.status === "fulfilled") {
-          setSubscription(subscriptionResult.value);
-        } else {
-          setSubscription(null);
-        }
-
-        if (plansResult.status === "fulfilled") {
-          setStudyPlans(plansResult.value.studyPlans);
-          setSelectedLevel(plansResult.value.studyPlans[0]?.hskLevel ?? 1);
-        }
-
-        const failedResult =
-          subscriptionResult.status === "rejected"
-            ? subscriptionResult
-            : plansResult.status === "rejected"
-              ? plansResult
-              : null;
-
-        if (failedResult) {
-          setError(
-            failedResult.reason instanceof Error
-              ? failedResult.reason.message
-              : "Không thể tải dữ liệu lộ trình."
-          );
-        }
+        setSubscription(learning.subscription);
+        setStudyPlans(learning.studyPlans);
+        setSelectedLevel(learning.studyPlans[0]?.hskLevel ?? 1);
+      } catch (caught) {
+        if (!mounted || accessToken !== loadedAccessToken) return;
+        setSubscription(null);
+        setStudyPlans([]);
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Không thể tải dữ liệu lộ trình."
+        );
       } finally {
         if (mounted && accessToken === loadedAccessToken) setLoading(false);
       }
