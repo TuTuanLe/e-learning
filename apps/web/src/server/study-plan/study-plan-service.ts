@@ -347,11 +347,37 @@ async function generateWithGroq(
   const content = payload?.choices?.[0]?.message?.content;
   if (!content) throw new ApiError(502, "Groq trả về nội dung trống.");
 
-  try {
-    return validateGeneratedPlan(JSON.parse(content), intake);
-  } catch {
+  const parsed = parseJsonContent(content);
+  if (parsed === null) {
+    console.error("[study-plan] Không parse được JSON từ Groq:", content.slice(0, 1000));
     throw new ApiError(502, "Lộ trình AI trả về không đúng định dạng.");
   }
+
+  return normalizeGeneratedPlan(parsed, intake);
+}
+
+function parseJsonContent(content: string): unknown {
+  const trimmed = content.trim();
+  const candidates = [trimmed];
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) candidates.push(fenced[1].trim());
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    candidates.push(trimmed.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // try the next candidate
+    }
+  }
+
+  return null;
 }
 
 function buildPrompt(intake: StudyPlanIntake, units: DictationUnit[]): string {
@@ -390,45 +416,62 @@ Trả đúng JSON:
 Phải có đúng ${intake.durationWeeks} weeks và mỗi week đúng ${intake.lessonsPerWeek} lessons.`;
 }
 
-function validateGeneratedPlan(value: unknown, intake: StudyPlanIntake): GeneratedPlan {
-  if (!isRecord(value)) throw new Error("Invalid plan");
-  if (value.durationWeeks !== intake.durationWeeks) throw new Error("Wrong duration");
-  if (!Array.isArray(value.weeks) || value.weeks.length !== intake.durationWeeks) {
-    throw new Error("Wrong weeks");
-  }
+function normalizeGeneratedPlan(value: unknown, intake: StudyPlanIntake): GeneratedPlan {
+  const root = isRecord(value) ? value : {};
+  const rawWeeks = Array.isArray(root.weeks) ? root.weeks : [];
+
+  const weeks: GeneratedWeek[] = Array.from({ length: intake.durationWeeks }, (_, weekIndex) => {
+    const rawWeek = isRecord(rawWeeks[weekIndex]) ? rawWeeks[weekIndex] : {};
+    const rawLessons = Array.isArray(rawWeek.lessons) ? rawWeek.lessons : [];
+
+    const lessons: GeneratedLesson[] = Array.from(
+      { length: intake.lessonsPerWeek },
+      (_, lessonIndex) => {
+        const rawLesson = isRecord(rawLessons[lessonIndex]) ? rawLessons[lessonIndex] : {};
+        return {
+          title: coerceString(rawLesson.title, 120, `Bài ${lessonIndex + 1}`),
+          description: coerceString(
+            rawLesson.description,
+            400,
+            "Luyện nghe chép theo chủ đề của bài học."
+          ),
+          topic: coerceString(rawLesson.topic, 80, intake.primaryGoal),
+          activities: coerceStringArray(rawLesson.activities, 6, 180, [
+            "Nghe và chép lại nội dung."
+          ]),
+          mode: coerceMode(rawLesson.mode)
+        };
+      }
+    );
+
+    return {
+      week: weekIndex + 1,
+      title: coerceString(rawWeek.title, 120, `Tuần ${weekIndex + 1}`),
+      objective: coerceString(rawWeek.objective, 500, "Củng cố kỹ năng nghe và phản xạ."),
+      milestone: coerceString(rawWeek.milestone, 300, "Hoàn thành các bài luyện trong tuần."),
+      lessons
+    };
+  });
 
   return {
-    title: readString(value.title, 160, "title"),
-    summary: readString(value.summary, 700, "summary"),
+    title: coerceString(root.title, 160, `Lộ trình HSK ${intake.hskLevel}`),
+    summary: coerceString(
+      root.summary,
+      700,
+      "Lộ trình học cá nhân hóa theo mục tiêu của bạn."
+    ),
     durationWeeks: intake.durationWeeks,
-    weeklyMinutes: readInteger(value.weeklyMinutes, 10, 5000, "weeklyMinutes"),
-    strategy: readStringArray(value.strategy, 8, 300, "strategy"),
-    weeks: value.weeks.map((rawWeek, weekIndex) => {
-      if (!isRecord(rawWeek)) throw new Error("Invalid week");
-      if (!Array.isArray(rawWeek.lessons) || rawWeek.lessons.length !== intake.lessonsPerWeek) {
-        throw new Error("Wrong lessons");
-      }
-
-      return {
-        week: weekIndex + 1,
-        title: readString(rawWeek.title, 120, "title"),
-        objective: readString(rawWeek.objective, 500, "objective"),
-        milestone: readString(rawWeek.milestone, 300, "milestone"),
-        lessons: rawWeek.lessons.map((rawLesson) => {
-          if (!isRecord(rawLesson)) throw new Error("Invalid lesson");
-          const mode = rawLesson.mode;
-          if (mode !== "TYPING" && mode !== "WORD_BANK") throw new Error("Invalid mode");
-
-          return {
-            title: readString(rawLesson.title, 120, "lesson title"),
-            description: readString(rawLesson.description, 400, "lesson description"),
-            topic: readString(rawLesson.topic, 80, "lesson topic"),
-            activities: readStringArray(rawLesson.activities, 6, 180, "activities"),
-            mode
-          };
-        })
-      };
-    })
+    weeklyMinutes: coerceInteger(
+      root.weeklyMinutes,
+      10,
+      5000,
+      intake.minutesPerDay * intake.daysPerWeek
+    ),
+    strategy: coerceStringArray(root.strategy, 8, 300, [
+      "Luyện nghe chép mỗi ngày để tăng phản xạ.",
+      "Ôn tập từ vựng và mẫu câu thường xuyên."
+    ]),
+    weeks
   };
 }
 
@@ -575,4 +618,44 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function coerceString(value: unknown, max: number, fallback: string): string {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) return fallback;
+  return text.length > max ? text.slice(0, max) : text;
+}
+
+function coerceInteger(value: unknown, min: number, max: number, fallback: number): number {
+  const numeric =
+    typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  if (!Number.isFinite(numeric)) return clamp(Math.round(fallback), min, max);
+  return clamp(Math.round(numeric), min, max);
+}
+
+function coerceStringArray(
+  value: unknown,
+  maxItems: number,
+  maxLength: number,
+  fallback: string[]
+): string[] {
+  if (!Array.isArray(value)) return fallback;
+
+  const items = value
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter((item) => item.length > 0)
+    .slice(0, maxItems)
+    .map((item) => (item.length > maxLength ? item.slice(0, maxLength) : item));
+
+  return items.length > 0 ? items : fallback;
+}
+
+function coerceMode(value: unknown): DictationMode {
+  return typeof value === "string" && value.trim().toUpperCase() === "WORD_BANK"
+    ? "WORD_BANK"
+    : "TYPING";
 }
