@@ -8,6 +8,13 @@ import { LogOut } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase";
 
+const navigationItems = [
+  { href: "/", label: "Luyện tập" },
+  { href: "/pinyin", label: "Bảng Pinyin" },
+  { href: "/study-plan", label: "Lộ trình AI" },
+  { href: "/pricing", label: "Gói học" }
+];
+
 export function AppHeader() {
   const pathname = usePathname();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -35,11 +42,7 @@ export function AppHeader() {
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2">
           <div className="mr-2 hidden items-center gap-1 md:flex">
-            {[
-              { href: "/", label: "Luyện tập" },
-              { href: "/study-plan", label: "Lộ trình AI" },
-              { href: "/pricing", label: "Gói học" }
-            ].map((item) => (
+            {navigationItems.map((item) => (
               <Link
                 key={item.href}
                 className={`focus-ring rounded-lg px-3 py-2 text-sm font-medium transition ${
@@ -77,6 +80,21 @@ export function AppHeader() {
           )}
         </nav>
       </div>
+      <nav className="no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto border-t border-hairline px-5 py-2 sm:px-8 md:hidden">
+        {navigationItems.map((item) => (
+          <Link
+            key={item.href}
+            className={`focus-ring shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition ${
+              pathname === item.href
+                ? "bg-canvas-soft text-ink"
+                : "text-ink-muted hover:bg-canvas-soft hover:text-ink"
+            }`}
+            href={item.href}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
     </header>
   );
 }
