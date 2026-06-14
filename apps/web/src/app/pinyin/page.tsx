@@ -1,14 +1,22 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   BookOpenText,
-  ExternalLink,
+  Maximize2,
+  Minimize2,
   Play,
+  Scan,
   Search,
-  Video,
   Volume2,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 
@@ -653,15 +661,32 @@ const TONE_MARKS: Record<string, string[]> = {
   ü: ["ǖ", "ǘ", "ǚ", "ǜ"],
 };
 
-const VIDEO_URL = "https://www.youtube-nocookie.com/embed/oTAMDkJxxdA";
-const VIDEO_SOURCE_URL = "https://www.youtube.com/watch?v=oTAMDkJxxdA";
 const PINYIN_AUDIO_BASE_URL =
   "https://raw.githubusercontent.com/davinfifield/mp3-chinese-pinyin-sound/master/mp3";
+const BASE_PINYIN_CELL_WIDTH = 66;
+const BASE_PINYIN_HEAD_WIDTH = 80;
+const BASE_PINYIN_ROW_HEIGHT = 48;
+const EXPANDED_TABLE_HEADER_HEIGHT = 58;
+const FIT_TABLE_PADDING = 18;
+const TABLE_ZOOM_STEPS = [0.8, 0.9, 1, 1.15, 1.3, 1.5] as const;
+const DEFAULT_TABLE_ZOOM_INDEX = 2;
+const BASE_PINYIN_TABLE_WIDTH =
+  BASE_PINYIN_HEAD_WIDTH + FINALS.length * BASE_PINYIN_CELL_WIDTH;
+const BASE_PINYIN_TABLE_HEIGHT = Math.max(
+  (PINYIN_ROWS.length + 1) * BASE_PINYIN_ROW_HEIGHT,
+  1520,
+);
 
 export default function PinyinPage() {
   const [selectedKey, setSelectedKey] = useState(DEFAULT_SYLLABLE.key);
   const [query, setQuery] = useState("");
   const [lastSpoken, setLastSpoken] = useState("");
+  const [tableExpanded, setTableExpanded] = useState(false);
+  const [tableFit, setTableFit] = useState(false);
+  const [tableZoomIndex, setTableZoomIndex] = useState(
+    DEFAULT_TABLE_ZOOM_INDEX,
+  );
+  const [viewportSize, setViewportSize] = useState({ width: 1280, height: 900 });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playTokenRef = useRef(0);
 
@@ -688,6 +713,90 @@ export default function PinyinPage() {
     () => new Set(matchedSyllables.map((item) => item.key)),
     [matchedSyllables],
   );
+  const tableZoom = TABLE_ZOOM_STEPS[tableZoomIndex];
+  const fitZoom = useMemo(() => {
+    const availableWidth = Math.max(320, viewportSize.width - FIT_TABLE_PADDING);
+    const availableHeight = Math.max(
+      240,
+      viewportSize.height - EXPANDED_TABLE_HEADER_HEIGHT - FIT_TABLE_PADDING,
+    );
+
+    return Math.min(
+      1,
+      availableWidth / BASE_PINYIN_TABLE_WIDTH,
+      availableHeight / BASE_PINYIN_TABLE_HEIGHT,
+    );
+  }, [viewportSize]);
+  const sizingTableZoom = tableFit ? 1 : tableZoom;
+  const displayTableZoom = tableFit ? fitZoom : tableZoom;
+  const canZoomOut = tableZoomIndex > 0;
+  const canZoomIn = tableZoomIndex < TABLE_ZOOM_STEPS.length - 1;
+  const tableSizingStyle = useMemo(
+    () =>
+      ({
+        "--pinyin-cell-width": `${Math.round(
+          BASE_PINYIN_CELL_WIDTH * sizingTableZoom,
+        )}px`,
+        "--pinyin-head-width": `${Math.round(
+          BASE_PINYIN_HEAD_WIDTH * sizingTableZoom,
+        )}px`,
+        "--pinyin-row-height": `${Math.round(
+          BASE_PINYIN_ROW_HEIGHT * sizingTableZoom,
+        )}px`,
+        "--pinyin-cell-font": `${Math.max(
+          8,
+          Math.round(15 * sizingTableZoom),
+        )}px`,
+        "--pinyin-head-font": `${Math.max(
+          8,
+          Math.round(14 * sizingTableZoom),
+        )}px`,
+        "--pinyin-initial-font": `${Math.max(
+          10,
+          Math.round(18 * sizingTableZoom),
+        )}px`,
+        "--pinyin-group-font": `${Math.max(
+          6,
+          Math.round(10 * sizingTableZoom),
+        )}px`,
+      }) as CSSProperties,
+    [sizingTableZoom],
+  );
+
+  useEffect(() => {
+    function updateViewportSize() {
+      setViewportSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    }
+
+    updateViewportSize();
+    window.addEventListener("resize", updateViewportSize);
+
+    return () => window.removeEventListener("resize", updateViewportSize);
+  }, []);
+
+  useEffect(() => {
+    if (!tableExpanded) return;
+
+    const previousOverflow = document.body.style.overflow;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setTableExpanded(false);
+        setTableFit(false);
+      }
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [tableExpanded]);
 
   function speakWithBrowser(text: string, tone: number) {
     const toneSettings: Record<number, { pitch: number; rate: number }> = {
@@ -806,7 +915,13 @@ export default function PinyinPage() {
         </div>
 
         <div className="mt-6 grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_390px]">
-          <section className="notion-shadow min-w-0 overflow-hidden rounded-2xl border border-hairline bg-white">
+          <section
+            className={
+              tableExpanded
+                ? "fixed inset-0 z-50 flex min-w-0 flex-col overflow-hidden border-0 bg-white shadow-2xl"
+                : "notion-shadow min-w-0 overflow-hidden rounded-2xl border border-hairline bg-white"
+            }
+          >
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-4 py-3 sm:px-5">
               <div className="flex items-center gap-2">
                 <BookOpenText className="size-4 text-primary" />
@@ -814,25 +929,110 @@ export default function PinyinPage() {
                   {SYLLABLES.length} âm tiết chuẩn
                 </p>
               </div>
-              <p className="text-sm text-ink-muted">
-                Đang chọn{" "}
-                <span className="font-semibold text-ink">
-                  {selected.syllable}
-                </span>
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-ink-muted">
+                  Đang chọn{" "}
+                  <span className="font-semibold text-ink">
+                    {selected.syllable}
+                  </span>
+                </p>
+                <div className="flex items-center overflow-hidden rounded-lg border border-hairline bg-white">
+                  <button
+                    className="focus-ring inline-flex size-9 items-center justify-center text-ink-secondary transition hover:bg-canvas-soft hover:text-ink disabled:pointer-events-none disabled:opacity-35"
+                    type="button"
+                    aria-label="Thu nhỏ bảng Pinyin"
+                    disabled={!canZoomOut}
+                    title="Zoom out"
+                    onClick={() => {
+                      setTableFit(false);
+                      setTableZoomIndex((value) => Math.max(0, value - 1));
+                    }}
+                  >
+                    <ZoomOut className="size-4" />
+                  </button>
+                  <span className="min-w-12 border-x border-hairline px-2 text-center text-xs font-semibold text-ink-secondary">
+                    {Math.round(displayTableZoom * 100)}%
+                  </span>
+                  <button
+                    className="focus-ring inline-flex size-9 items-center justify-center text-ink-secondary transition hover:bg-canvas-soft hover:text-ink disabled:pointer-events-none disabled:opacity-35"
+                    type="button"
+                    aria-label="Phóng to bảng Pinyin"
+                    disabled={!canZoomIn}
+                    title="Zoom in"
+                    onClick={() => {
+                      setTableFit(false);
+                      setTableZoomIndex((value) =>
+                        Math.min(TABLE_ZOOM_STEPS.length - 1, value + 1),
+                      );
+                    }}
+                  >
+                    <ZoomIn className="size-4" />
+                  </button>
+                </div>
+                <button
+                  className={`focus-ring inline-flex size-9 items-center justify-center rounded-lg border transition ${
+                    tableFit
+                      ? "border-primary bg-blue-50 text-primary"
+                      : "border-hairline bg-white text-ink-secondary hover:bg-canvas-soft hover:text-ink"
+                  }`}
+                  type="button"
+                  aria-label="Fit toàn bộ bảng Pinyin"
+                  aria-pressed={tableFit}
+                  title="Fit toàn bảng"
+                  onClick={() => {
+                    setTableExpanded(true);
+                    setTableFit((value) => !value);
+                  }}
+                >
+                  <Scan className="size-4" />
+                </button>
+                <button
+                  className="focus-ring inline-flex size-9 items-center justify-center rounded-lg border border-hairline bg-white text-ink-secondary transition hover:bg-canvas-soft hover:text-ink"
+                  type="button"
+                  aria-label={
+                    tableExpanded ? "Thu nhỏ bảng Pinyin" : "Phóng to bảng Pinyin"
+                  }
+                  aria-pressed={tableExpanded}
+                  title={tableExpanded ? "Thu nhỏ bảng" : "Xem bảng full size"}
+                  onClick={() => {
+                    setTableExpanded((value) => !value);
+                    if (tableExpanded) setTableFit(false);
+                  }}
+                >
+                  {tableExpanded ? (
+                    <Minimize2 className="size-4" />
+                  ) : (
+                    <Maximize2 className="size-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
-            <div className="max-h-[calc(100vh-220px)] overflow-auto">
-              <table className="w-max min-w-full border-collapse text-left">
+            <div
+              className={
+                tableExpanded
+                  ? "min-h-0 flex-1 overflow-auto"
+                  : "max-h-[calc(100vh-220px)] overflow-auto"
+              }
+              style={tableSizingStyle}
+            >
+              <table
+                className="w-max min-w-full border-collapse text-left"
+                style={
+                  tableFit
+                    ? ({ zoom: fitZoom } as CSSProperties)
+                    : undefined
+                }
+              >
                 <thead>
                   <tr>
-                    <th className="sticky left-0 top-0 z-30 w-20 min-w-20 border-b border-r border-orange-500/40 bg-[#f0982c] px-3 py-3 text-sm font-bold text-ink shadow-sm">
+                    <th className="sticky left-0 top-0 z-30 w-[var(--pinyin-head-width)] min-w-[var(--pinyin-head-width)] border-b border-r border-orange-500/40 bg-[#f0982c] px-3 py-3 text-[var(--pinyin-head-font)] font-bold text-ink shadow-sm">
                       âm đầu
                     </th>
                     {FINALS.map((final) => (
                       <th
                         key={final.id}
-                        className="sticky top-0 z-20 min-w-[66px] border-b border-r border-orange-500/40 bg-[#f0982c] px-3 py-3 text-center text-sm font-bold text-ink shadow-sm"
+                        className="sticky top-0 z-20 min-w-[var(--pinyin-cell-width)] border-b border-r border-orange-500/40 bg-[#f0982c] px-3 py-3 text-center text-[var(--pinyin-head-font)] font-bold text-ink shadow-sm"
                       >
                         {final.label}
                       </th>
@@ -843,11 +1043,8 @@ export default function PinyinPage() {
                   {PINYIN_ROWS.map((row) => (
                     <tr key={row.initial || "zero"} className="group">
                       <th className="sticky left-0 z-10 border-b border-r border-hairline bg-orange-50 px-3 py-2 align-middle">
-                        <span className="block text-lg font-black text-[#c45200]">
+                        <span className="block text-[var(--pinyin-initial-font)] font-black text-[#c45200]">
                           {row.initial || "0"}
-                        </span>
-                        <span className="mt-1 block max-w-[4.5rem] text-[10px] font-semibold uppercase leading-3 tracking-[0.08em] text-[#9b4a08]">
-                          {row.group}
                         </span>
                       </th>
                       {FINALS.map((final) => {
@@ -859,13 +1056,13 @@ export default function PinyinPage() {
                         return (
                           <td
                             key={final.id}
-                            className={`h-12 min-w-[66px] border-b border-r border-hairline bg-white p-0 text-center transition ${
+                            className={`h-[var(--pinyin-row-height)] min-w-[var(--pinyin-cell-width)] border-b border-r border-hairline bg-white p-0 text-center transition ${
                               active ? "bg-amber-100" : ""
                             } ${dimmed ? "opacity-25" : ""}`}
                           >
                             {syllable ? (
                               <button
-                                className={`focus-ring flex size-full min-h-12 items-center justify-center px-2 text-[15px] font-semibold transition hover:bg-blue-50 hover:text-primary ${
+                                className={`focus-ring flex size-full min-h-[var(--pinyin-row-height)] items-center justify-center px-2 text-[var(--pinyin-cell-font)] font-semibold transition hover:bg-blue-50 hover:text-primary ${
                                   active
                                     ? "bg-[#ffb020] text-ink"
                                     : "text-ink-secondary"
@@ -877,7 +1074,7 @@ export default function PinyinPage() {
                                 {syllable}
                               </button>
                             ) : (
-                              <span className="block min-h-12" />
+                              <span className="block min-h-[var(--pinyin-row-height)]" />
                             )}
                           </td>
                         );
