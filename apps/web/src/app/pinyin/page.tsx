@@ -19,6 +19,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { HanziStrokePanel } from "@/components/hanzi-stroke-player";
 
 const FINALS = [
   { id: "a", label: "a" },
@@ -75,6 +76,13 @@ type PinyinSyllable = {
   final: FinalId;
   finalLabel: string;
   group: string;
+};
+
+type PinyinExample = {
+  hanzi: string;
+  pinyin: string;
+  meaning: string;
+  source?: "word" | "practice";
 };
 
 const FINAL_LABEL_BY_ID = Object.fromEntries(
@@ -661,6 +669,161 @@ const TONE_MARKS: Record<string, string[]> = {
   ü: ["ǖ", "ǘ", "ǚ", "ǜ"],
 };
 
+const PINYIN_EXAMPLES: Record<string, PinyinExample[]> = {
+  ai: [{ hanzi: "爱", pinyin: "ài", meaning: "yêu" }],
+  an: [{ hanzi: "安", pinyin: "ān", meaning: "yên ổn" }],
+  ba: [{ hanzi: "爸爸", pinyin: "bàba", meaning: "bố" }],
+  bai: [{ hanzi: "白", pinyin: "bái", meaning: "màu trắng" }],
+  ban: [{ hanzi: "班", pinyin: "bān", meaning: "lớp" }],
+  bang: [{ hanzi: "帮", pinyin: "bāng", meaning: "giúp" }],
+  bao: [{ hanzi: "包", pinyin: "bāo", meaning: "túi, gói" }],
+  bei: [{ hanzi: "北", pinyin: "běi", meaning: "phía bắc" }],
+  ben: [{ hanzi: "本", pinyin: "běn", meaning: "quyển, gốc" }],
+  bi: [{ hanzi: "比", pinyin: "bǐ", meaning: "so sánh" }],
+  bian: [{ hanzi: "边", pinyin: "biān", meaning: "bên cạnh" }],
+  biao: [{ hanzi: "表", pinyin: "biǎo", meaning: "bảng, đồng hồ" }],
+  bie: [{ hanzi: "别", pinyin: "bié", meaning: "đừng, khác" }],
+  bing: [{ hanzi: "病", pinyin: "bìng", meaning: "bệnh" }],
+  bu: [{ hanzi: "不", pinyin: "bù", meaning: "không" }],
+  cai: [{ hanzi: "菜", pinyin: "cài", meaning: "món ăn, rau" }],
+  cha: [{ hanzi: "茶", pinyin: "chá", meaning: "trà" }],
+  chang: [{ hanzi: "长", pinyin: "cháng", meaning: "dài" }],
+  che: [{ hanzi: "车", pinyin: "chē", meaning: "xe" }],
+  chi: [{ hanzi: "吃", pinyin: "chī", meaning: "ăn" }],
+  da: [{ hanzi: "大", pinyin: "dà", meaning: "lớn" }],
+  dai: [
+    { hanzi: "带", pinyin: "dài", meaning: "mang theo" },
+    { hanzi: "等待", pinyin: "děngdài", meaning: "chờ đợi" },
+  ],
+  dan: [
+    { hanzi: "单", pinyin: "dān", meaning: "đơn, lẻ" },
+    { hanzi: "但是", pinyin: "dànshì", meaning: "nhưng" },
+  ],
+  dao: [{ hanzi: "到", pinyin: "dào", meaning: "đến" }],
+  de: [{ hanzi: "的", pinyin: "de", meaning: "trợ từ sở hữu" }],
+  deng: [{ hanzi: "等", pinyin: "děng", meaning: "đợi" }],
+  dian: [{ hanzi: "点", pinyin: "diǎn", meaning: "điểm, giờ" }],
+  dong: [{ hanzi: "东", pinyin: "dōng", meaning: "phía đông" }],
+  dou: [{ hanzi: "都", pinyin: "dōu", meaning: "đều" }],
+  du: [{ hanzi: "读", pinyin: "dú", meaning: "đọc" }],
+  dui: [{ hanzi: "对", pinyin: "duì", meaning: "đúng, đối với" }],
+  duo: [{ hanzi: "多", pinyin: "duō", meaning: "nhiều" }],
+  e: [{ hanzi: "饿", pinyin: "è", meaning: "đói" }],
+  er: [{ hanzi: "二", pinyin: "èr", meaning: "số hai" }],
+  fa: [{ hanzi: "发", pinyin: "fā", meaning: "gửi, phát" }],
+  fan: [{ hanzi: "饭", pinyin: "fàn", meaning: "cơm" }],
+  fang: [{ hanzi: "房", pinyin: "fáng", meaning: "phòng, nhà" }],
+  fei: [{ hanzi: "飞", pinyin: "fēi", meaning: "bay" }],
+  fen: [{ hanzi: "分", pinyin: "fēn", meaning: "phút, chia" }],
+  fu: [{ hanzi: "服", pinyin: "fú", meaning: "quần áo, phục" }],
+  ge: [{ hanzi: "个", pinyin: "ge", meaning: "lượng từ" }],
+  gei: [{ hanzi: "给", pinyin: "gěi", meaning: "cho" }],
+  gong: [{ hanzi: "工作", pinyin: "gōngzuò", meaning: "công việc" }],
+  guo: [{ hanzi: "国", pinyin: "guó", meaning: "nước, quốc gia" }],
+  hao: [{ hanzi: "好", pinyin: "hǎo", meaning: "tốt" }],
+  he: [{ hanzi: "和", pinyin: "hé", meaning: "và" }],
+  hen: [{ hanzi: "很", pinyin: "hěn", meaning: "rất" }],
+  hui: [{ hanzi: "会", pinyin: "huì", meaning: "biết, sẽ" }],
+  jia: [{ hanzi: "家", pinyin: "jiā", meaning: "nhà" }],
+  jian: [{ hanzi: "见", pinyin: "jiàn", meaning: "gặp" }],
+  jiao: [{ hanzi: "叫", pinyin: "jiào", meaning: "gọi, tên là" }],
+  jie: [{ hanzi: "姐姐", pinyin: "jiějie", meaning: "chị gái" }],
+  jin: [{ hanzi: "今天", pinyin: "jīntiān", meaning: "hôm nay" }],
+  jiu: [{ hanzi: "九", pinyin: "jiǔ", meaning: "số chín" }],
+  ju: [{ hanzi: "句子", pinyin: "jùzi", meaning: "câu" }],
+  jue: [{ hanzi: "觉得", pinyin: "juéde", meaning: "cảm thấy" }],
+  kai: [{ hanzi: "开", pinyin: "kāi", meaning: "mở" }],
+  kan: [{ hanzi: "看", pinyin: "kàn", meaning: "nhìn, xem" }],
+  kao: [{ hanzi: "考试", pinyin: "kǎoshì", meaning: "thi" }],
+  ke: [{ hanzi: "课", pinyin: "kè", meaning: "bài học" }],
+  kou: [{ hanzi: "口", pinyin: "kǒu", meaning: "miệng" }],
+  kuai: [{ hanzi: "快", pinyin: "kuài", meaning: "nhanh" }],
+  lai: [{ hanzi: "来", pinyin: "lái", meaning: "đến" }],
+  lao: [{ hanzi: "老师", pinyin: "lǎoshī", meaning: "giáo viên" }],
+  le: [{ hanzi: "了", pinyin: "le", meaning: "trợ từ hoàn thành" }],
+  li: [{ hanzi: "里", pinyin: "lǐ", meaning: "bên trong" }],
+  lian: [{ hanzi: "脸", pinyin: "liǎn", meaning: "mặt" }],
+  liang: [{ hanzi: "两", pinyin: "liǎng", meaning: "hai" }],
+  ling: [{ hanzi: "零", pinyin: "líng", meaning: "số không" }],
+  liu: [{ hanzi: "六", pinyin: "liù", meaning: "số sáu" }],
+  lu: [{ hanzi: "路", pinyin: "lù", meaning: "đường" }],
+  lü: [
+    { hanzi: "绿", pinyin: "lǜ", meaning: "màu xanh lá" },
+    { hanzi: "旅行", pinyin: "lǚxíng", meaning: "du lịch" },
+  ],
+  lüe: [{ hanzi: "略", pinyin: "lüè", meaning: "lược, hơi" }],
+  ma: [{ hanzi: "妈妈", pinyin: "māma", meaning: "mẹ" }],
+  mai: [{ hanzi: "买", pinyin: "mǎi", meaning: "mua" }],
+  man: [{ hanzi: "慢", pinyin: "màn", meaning: "chậm" }],
+  mang: [{ hanzi: "忙", pinyin: "máng", meaning: "bận" }],
+  mao: [{ hanzi: "猫", pinyin: "māo", meaning: "mèo" }],
+  mei: [{ hanzi: "没", pinyin: "méi", meaning: "không có" }],
+  men: [{ hanzi: "门", pinyin: "mén", meaning: "cửa" }],
+  ming: [{ hanzi: "名字", pinyin: "míngzi", meaning: "tên" }],
+  na: [{ hanzi: "那", pinyin: "nà", meaning: "kia, đó" }],
+  nai: [{ hanzi: "奶", pinyin: "nǎi", meaning: "sữa" }],
+  nan: [{ hanzi: "男", pinyin: "nán", meaning: "nam" }],
+  nao: [{ hanzi: "脑", pinyin: "nǎo", meaning: "não" }],
+  ne: [{ hanzi: "呢", pinyin: "ne", meaning: "trợ từ hỏi" }],
+  ni: [{ hanzi: "你", pinyin: "nǐ", meaning: "bạn" }],
+  nian: [{ hanzi: "年", pinyin: "nián", meaning: "năm" }],
+  nin: [{ hanzi: "您", pinyin: "nín", meaning: "ngài, bạn lịch sự" }],
+  niu: [{ hanzi: "牛", pinyin: "niú", meaning: "con bò" }],
+  nü: [
+    { hanzi: "女", pinyin: "nǚ", meaning: "nữ, con gái" },
+    { hanzi: "女人", pinyin: "nǚrén", meaning: "phụ nữ" },
+  ],
+  nüe: [{ hanzi: "虐", pinyin: "nüè", meaning: "ngược đãi" }],
+  pao: [{ hanzi: "跑", pinyin: "pǎo", meaning: "chạy" }],
+  peng: [{ hanzi: "朋友", pinyin: "péngyou", meaning: "bạn bè" }],
+  qi: [{ hanzi: "七", pinyin: "qī", meaning: "số bảy" }],
+  qian: [{ hanzi: "钱", pinyin: "qián", meaning: "tiền" }],
+  qing: [{ hanzi: "请", pinyin: "qǐng", meaning: "mời" }],
+  qu: [{ hanzi: "去", pinyin: "qù", meaning: "đi" }],
+  quan: [{ hanzi: "全", pinyin: "quán", meaning: "toàn bộ" }],
+  que: [{ hanzi: "确", pinyin: "què", meaning: "chính xác" }],
+  ren: [{ hanzi: "人", pinyin: "rén", meaning: "người" }],
+  ri: [{ hanzi: "日", pinyin: "rì", meaning: "ngày, mặt trời" }],
+  rou: [{ hanzi: "肉", pinyin: "ròu", meaning: "thịt" }],
+  shang: [{ hanzi: "上", pinyin: "shàng", meaning: "trên" }],
+  sheng: [{ hanzi: "生", pinyin: "shēng", meaning: "sinh, sống" }],
+  shi: [{ hanzi: "是", pinyin: "shì", meaning: "là" }],
+  shou: [{ hanzi: "手", pinyin: "shǒu", meaning: "tay" }],
+  shui: [{ hanzi: "水", pinyin: "shuǐ", meaning: "nước" }],
+  shuo: [{ hanzi: "说", pinyin: "shuō", meaning: "nói" }],
+  si: [{ hanzi: "四", pinyin: "sì", meaning: "số bốn" }],
+  ta: [{ hanzi: "他", pinyin: "tā", meaning: "anh ấy" }],
+  tai: [{ hanzi: "太", pinyin: "tài", meaning: "quá, rất" }],
+  tian: [{ hanzi: "天", pinyin: "tiān", meaning: "trời, ngày" }],
+  ting: [{ hanzi: "听", pinyin: "tīng", meaning: "nghe" }],
+  tong: [{ hanzi: "同", pinyin: "tóng", meaning: "cùng" }],
+  wan: [{ hanzi: "晚", pinyin: "wǎn", meaning: "muộn, tối" }],
+  wei: [{ hanzi: "喂", pinyin: "wèi", meaning: "alo" }],
+  wo: [{ hanzi: "我", pinyin: "wǒ", meaning: "tôi" }],
+  wu: [{ hanzi: "五", pinyin: "wǔ", meaning: "số năm" }],
+  xi: [{ hanzi: "西", pinyin: "xī", meaning: "phía tây" }],
+  xia: [{ hanzi: "下", pinyin: "xià", meaning: "dưới" }],
+  xian: [{ hanzi: "先", pinyin: "xiān", meaning: "trước" }],
+  xiang: [{ hanzi: "想", pinyin: "xiǎng", meaning: "muốn, nghĩ" }],
+  xiao: [{ hanzi: "小", pinyin: "xiǎo", meaning: "nhỏ" }],
+  xie: [{ hanzi: "写", pinyin: "xiě", meaning: "viết" }],
+  xin: [{ hanzi: "新", pinyin: "xīn", meaning: "mới" }],
+  xing: [{ hanzi: "星", pinyin: "xīng", meaning: "ngôi sao" }],
+  xiong: [{ hanzi: "熊", pinyin: "xióng", meaning: "gấu" }],
+  xu: [{ hanzi: "许", pinyin: "xǔ", meaning: "cho phép, hứa" }],
+  xue: [{ hanzi: "学", pinyin: "xué", meaning: "học" }],
+  yao: [{ hanzi: "要", pinyin: "yào", meaning: "muốn, cần" }],
+  ye: [{ hanzi: "也", pinyin: "yě", meaning: "cũng" }],
+  yi: [{ hanzi: "一", pinyin: "yī", meaning: "số một" }],
+  you: [{ hanzi: "有", pinyin: "yǒu", meaning: "có" }],
+  yu: [{ hanzi: "雨", pinyin: "yǔ", meaning: "mưa" }],
+  yue: [{ hanzi: "月", pinyin: "yuè", meaning: "tháng, mặt trăng" }],
+  zai: [{ hanzi: "在", pinyin: "zài", meaning: "ở, đang" }],
+  zhe: [{ hanzi: "这", pinyin: "zhè", meaning: "này" }],
+  zhong: [{ hanzi: "中", pinyin: "zhōng", meaning: "giữa, Trung" }],
+  zuo: [{ hanzi: "做", pinyin: "zuò", meaning: "làm" }],
+};
+
 const PINYIN_AUDIO_BASE_URL =
   "https://raw.githubusercontent.com/davinfifield/mp3-chinese-pinyin-sound/master/mp3";
 const BASE_PINYIN_CELL_WIDTH = 66;
@@ -1110,6 +1273,11 @@ function PinyinDetailPanel({
     ...tone,
     value: markTone(selected.syllable, tone.tone),
   }));
+  const examples = useMemo(
+    () => getExamplesForSyllable(selected.syllable),
+    [selected.syllable],
+  );
+  const pronunciationNote = getPronunciationNote(selected);
 
   return (
     <aside className="notion-shadow h-fit rounded-2xl border border-hairline bg-white p-5 xl:sticky xl:top-5">
@@ -1151,6 +1319,12 @@ function PinyinDetailPanel({
         </p>
       </div>
 
+      {pronunciationNote ? (
+        <div className="mt-4 rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 text-sm font-medium leading-6 text-cyan-900">
+          {pronunciationNote}
+        </div>
+      ) : null}
+
       <div className="mt-5">
         <p className="text-sm font-semibold text-ink-secondary">
           Nghe theo thanh
@@ -1180,8 +1354,80 @@ function PinyinDetailPanel({
           ))}
         </div>
       </div>
+
+      <PinyinExamples examples={examples} />
     </aside>
   );
+}
+
+function PinyinExamples({ examples }: { examples: PinyinExample[] }) {
+  return (
+    <div className="mt-5">
+      <p className="text-sm font-semibold text-ink-secondary">Từ ví dụ</p>
+      <div className="mt-3 grid gap-2">
+        {examples.map((example) => {
+          const exampleKey = `${example.hanzi}-${example.pinyin}-${example.source ?? "word"}`;
+          const hanziCharacters = getHanziCharacters(example.hanzi);
+
+          return (
+            <div
+              key={exampleKey}
+              className={`rounded-xl border p-3 ${
+                example.source === "practice"
+                  ? "border-dashed border-cyan-200 bg-cyan-50/60"
+                  : "border-hairline bg-white"
+              }`}
+            >
+              <div className="grid min-w-0 gap-1">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span
+                    className={`font-black tracking-[-0.3px] text-ink ${
+                      example.hanzi.length > 8 ? "text-xl" : "text-2xl"
+                    }`}
+                  >
+                    {example.hanzi}
+                  </span>
+                  {example.source === "practice" ? (
+                    <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[11px] font-semibold text-cyan-700">
+                      Luyện âm
+                    </span>
+                  ) : null}
+                </div>
+                <span className="break-words text-sm font-bold leading-5 text-primary">
+                  {example.pinyin}
+                </span>
+              </div>
+              <p className="mt-1 text-sm font-medium leading-5 text-ink-muted">
+                {example.meaning}
+              </p>
+
+              {hanziCharacters.length > 0 ? (
+                <HanziStrokePanel
+                  characters={hanziCharacters}
+                  label={example.hanzi}
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function getHanziCharacters(value: string) {
+  const seen = new Set<string>();
+
+  return Array.from(value)
+    .filter((character) => {
+      if (!/[\u3400-\u9fff]/u.test(character) || seen.has(character)) {
+        return false;
+      }
+
+      seen.add(character);
+      return true;
+    })
+    .slice(0, 8);
 }
 
 function InfoBlock({ label, value }: { label: string; value: string }) {
@@ -1195,6 +1441,55 @@ function InfoBlock({ label, value }: { label: string; value: string }) {
       </p>
     </div>
   );
+}
+
+function getExamplesForSyllable(syllable: string) {
+  const directExamples = PINYIN_EXAMPLES[syllable] ?? [];
+  const examples = dedupeExamples(directExamples).slice(0, 2);
+
+  if (examples.length > 0) return examples;
+
+  return [createPracticeExample(syllable)];
+}
+
+function dedupeExamples(examples: PinyinExample[]) {
+  const seen = new Set<string>();
+
+  return examples.filter((example) => {
+    const key = `${example.hanzi}-${example.pinyin}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function createPracticeExample(syllable: string): PinyinExample {
+  return {
+    hanzi: markTone(syllable, 1),
+    pinyin: TONES.map((tone) => markTone(syllable, tone.tone)).join(" · "),
+    meaning: "Luyện đủ 5 thanh của âm này bằng các nút nghe phía trên.",
+    source: "practice",
+  };
+}
+
+function getPronunciationNote(selected: PinyinSyllable) {
+  if (selected.syllable === "nü") {
+    return "Âm nü thường gặp trong 女 (nǚ). Giữ dấu hai chấm trên ü để phân biệt với nu.";
+  }
+
+  if (selected.syllable === "lü") {
+    return "Âm lü giữ dấu hai chấm trên ü, ví dụ 绿 (lǜ) hoặc 旅行 (lǚxíng).";
+  }
+
+  if (selected.syllable.includes("ü")) {
+    return "Nhóm âm này dùng ü: môi tròn như u, lưỡi gần vị trí i.";
+  }
+
+  if (["j", "q", "x"].includes(selected.initial) && selected.final.startsWith("ü")) {
+    return "Sau j, q, x, ü được viết thành u: ju, qu, xu vẫn đọc theo âm ü.";
+  }
+
+  return "";
 }
 
 function getPinyinAudioUrl(syllable: string, tone: number) {

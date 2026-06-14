@@ -11,6 +11,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase";
 const navigationItems = [
   { href: "/", label: "Luyện tập" },
   { href: "/pinyin", label: "Bảng Pinyin" },
+  { href: "/strokes", label: "Nét cơ bản" },
   { href: "/study-plan", label: "Lộ trình AI" },
   { href: "/pricing", label: "Gói học" }
 ];
@@ -80,11 +81,11 @@ export function AppHeader() {
           )}
         </nav>
       </div>
-      <nav className="no-scrollbar mx-auto flex max-w-7xl gap-1 overflow-x-auto border-t border-hairline px-5 py-2 sm:px-8 md:hidden">
+      <nav className="mx-auto grid max-w-7xl grid-cols-2 gap-1 border-t border-hairline px-5 py-2 sm:grid-cols-5 sm:px-8 md:hidden">
         {navigationItems.map((item) => (
           <Link
             key={item.href}
-            className={`focus-ring shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition ${
+            className={`focus-ring rounded-lg px-3 py-2 text-center text-sm font-medium transition ${
               pathname === item.href
                 ? "bg-canvas-soft text-ink"
                 : "text-ink-muted hover:bg-canvas-soft hover:text-ink"

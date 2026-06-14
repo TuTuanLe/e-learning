@@ -80,6 +80,23 @@ a {
   outline-offset: 2px;
 }
 
+.hanzi-single-stroke-fill {
+  fill: #111827;
+}
+
+.hanzi-single-stroke-mask {
+  fill: none;
+  stroke: white;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 180;
+}
+
+.hanzi-single-stroke-outline {
+  fill: #d8dee8;
+  opacity: 0.72;
+}
+
 .no-scrollbar {
   scrollbar-width: none;
 }
