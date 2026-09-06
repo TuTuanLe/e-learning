@@ -28,31 +28,48 @@ export function isGameAudioMuted(): boolean {
   return isMuted;
 }
 
-// 1. Dagger Launch Whoosh Sound (High-speed projectile swoosh)
-export function playDaggerWhoosh(): void {
+// 1. Dagger / Bow Launch Whoosh Sound (Tight string twang + high-speed projectile swoosh)
+export function playBowShoot(): void {
   if (isMuted) return;
   const ctx = getAudioContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
+  // String twang
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(520, now);
+  osc.frequency.exponentialRampToValueAtTime(110, now + 0.08);
 
-  // White-noise-like frequency sweep
-  osc.type = "triangle";
-  osc.frequency.setValueAtTime(420, now);
-  osc.frequency.exponentialRampToValueAtTime(1450, now + 0.08);
-  osc.frequency.exponentialRampToValueAtTime(180, now + 0.16);
-
-  gain.gain.setValueAtTime(0.01, now);
-  gain.gain.linearRampToValueAtTime(0.35, now + 0.04);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+  gain.gain.setValueAtTime(0.4, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
   osc.connect(gain);
   gain.connect(ctx.destination);
-
   osc.start(now);
-  osc.stop(now + 0.16);
+  osc.stop(now + 0.08);
+
+  // Arrow whistle whoosh
+  const whistle = ctx.createOscillator();
+  const whistleGain = ctx.createGain();
+  whistle.type = "triangle";
+  whistle.frequency.setValueAtTime(350, now + 0.02);
+  whistle.frequency.exponentialRampToValueAtTime(1600, now + 0.12);
+  whistle.frequency.exponentialRampToValueAtTime(400, now + 0.2);
+
+  whistleGain.gain.setValueAtTime(0.01, now + 0.02);
+  whistleGain.gain.linearRampToValueAtTime(0.3, now + 0.07);
+  whistleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+  whistle.connect(whistleGain);
+  whistleGain.connect(ctx.destination);
+  whistle.start(now + 0.02);
+  whistle.stop(now + 0.2);
+}
+
+export function playDaggerWhoosh(): void {
+  playBowShoot();
 }
 
 // 2. Word Hit & Burst Pop Sound (Crisp explosion chime)
