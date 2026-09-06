@@ -25,6 +25,7 @@ import {
   Play,
   Puzzle,
   Sparkles,
+  Swords,
   Target,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -42,11 +43,14 @@ const coverByCollection: Record<string, string> = {
   "hsk-6": "/hsk6.webp",
 };
 
+export type LearningMode = DictationMode | "FALLING_WORDS";
+
 const modeOptions: Array<{
-  id: DictationMode;
+  id: LearningMode;
   label: string;
   description: string;
   icon: typeof Keyboard;
+  badge?: string;
 }> = [
   {
     id: "TYPING",
@@ -59,6 +63,13 @@ const modeOptions: Array<{
     label: "Word bank",
     description: "Sắp xếp các mảnh thành câu hoàn chỉnh.",
     icon: Puzzle,
+  },
+  {
+    id: "FALLING_WORDS",
+    label: "Phi đao luyện chữ",
+    description: "Chữ Hán rơi tự do, gõ Pinyin để phóng phi đao phá vỡ từ.",
+    icon: Swords,
+    badge: "Mới · Game",
   },
 ];
 
@@ -82,7 +93,7 @@ export default function HomePage() {
     () => dictationApi.getCachedCatalog()?.collections[0]?.units[0]?.id ?? "",
   );
   const [topic, setTopic] = useState("Tất cả");
-  const [mode, setMode] = useState<DictationMode>("TYPING");
+  const [mode, setMode] = useState<LearningMode>("TYPING");
   const [loading, setLoading] = useState(
     () => !dictationApi.getCachedCatalog(),
   );
@@ -235,6 +246,13 @@ export default function HomePage() {
       return;
     }
 
+    if (mode === "FALLING_WORDS") {
+      router.push(
+        `/games/falling-words?collectionId=${collection.id}&unitId=${unit.id}`,
+      );
+      return;
+    }
+
     setStarting(true);
     setError("");
 
@@ -248,7 +266,11 @@ export default function HomePage() {
       }
 
       const session = await dictationApi.createSession(
-        { collectionId: collection.id, unitId: unit.id, mode },
+        {
+          collectionId: collection.id,
+          unitId: unit.id,
+          mode: mode as DictationMode,
+        },
         token,
       );
       router.push(`/sessions/${session.id}`);
@@ -509,7 +531,14 @@ export default function HomePage() {
                       <Icon className="size-4" />
                     </span>
                     <span>
-                      <span className="block font-semibold">{item.label}</span>
+                      <span className="flex items-center gap-2 font-semibold">
+                        {item.label}
+                        {item.badge && (
+                          <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                            {item.badge}
+                          </span>
+                        )}
+                      </span>
                       <span className="mt-1 block text-sm leading-5 text-ink-muted">
                         {item.description}
                       </span>
@@ -525,7 +554,11 @@ export default function HomePage() {
                 {collection?.title ?? "HSK"} · {unit?.title ?? "Bài học"}
               </p>
               <p className="mt-1 text-sm text-ink-muted">
-                {mode === "TYPING" ? "Typing mode" : "Word bank"}
+                {mode === "TYPING"
+                  ? "Typing mode"
+                  : mode === "WORD_BANK"
+                    ? "Word bank"
+                    : "Phi đao luyện chữ (Game)"}
               </p>
             </div>
             {error ? (
@@ -546,7 +579,9 @@ export default function HomePage() {
                 ? "Mở khóa bài học"
                 : starting
                   ? "Đang tạo bài..."
-                  : "Bắt đầu"}
+                  : mode === "FALLING_WORDS"
+                    ? "Chơi Phi Đao Luyện Chữ 🗡️"
+                    : "Bắt đầu"}
             </button>
             <div className="my-5 border-t border-hairline" />
             {activeRoadmap?.nextLesson ? (
