@@ -847,6 +847,41 @@ const BASE_PINYIN_TABLE_HEIGHT = Math.max(
   1520,
 );
 
+const PINYIN_TABS = [
+  {
+    id: "table" as const,
+    label: "Bảng Pinyin",
+    tag: "Tra cứu",
+    icon: Grid3X3,
+    activeIconColor: "text-ink",
+    activeBadgeColor: "bg-stone-100 text-stone-700",
+  },
+  {
+    id: "tones" as const,
+    label: "Luyện Thanh Điệu",
+    tag: "Tone Trainer",
+    icon: Activity,
+    activeIconColor: "text-sky-600",
+    activeBadgeColor: "bg-sky-100 text-sky-700",
+  },
+  {
+    id: "pairs" as const,
+    label: "Phân Biệt Cặp Âm",
+    tag: "Minimal Pairs",
+    icon: Headphones,
+    activeIconColor: "text-emerald-600",
+    activeBadgeColor: "bg-emerald-100 text-emerald-700",
+  },
+  {
+    id: "lessons" as const,
+    label: "10 Bài Học",
+    tag: "Lộ trình",
+    icon: GraduationCap,
+    activeIconColor: "text-violet-600",
+    activeBadgeColor: "bg-violet-100 text-violet-700",
+  },
+];
+
 export default function PinyinPage() {
   const [activeTab, setActiveTab] = useState<
     "table" | "tones" | "pairs" | "lessons"
@@ -1066,58 +1101,44 @@ export default function PinyinPage() {
 
       <section className="mx-auto max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
         {/* Navigation Tabs */}
-        <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-hairline pb-4">
-          <button
-            type="button"
-            onClick={() => handleTabChange("table")}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all ${
-              activeTab === "table"
-                ? "bg-ink text-white shadow-sm"
-                : "border border-hairline bg-white text-ink-muted hover:border-ink/20 hover:text-ink"
-            }`}
-          >
-            <Grid3X3 className="size-4" />
-            Bảng Pinyin Tra Cứu
-          </button>
+        <div className="mb-6 flex items-center justify-between border-b border-hairline pb-4">
+          <div className="inline-flex max-w-full items-center gap-1.5 overflow-x-auto rounded-2xl border border-hairline bg-canvas-soft/80 p-1.5 shadow-2xs backdrop-blur-xs">
+            {PINYIN_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
 
-          <button
-            type="button"
-            onClick={() => handleTabChange("tones")}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all ${
-              activeTab === "tones"
-                ? "bg-ink text-white shadow-sm"
-                : "border border-hairline bg-white text-ink-muted hover:border-ink/20 hover:text-ink"
-            }`}
-          >
-            <Activity className="size-4 text-sky-500" />
-            Luyện Thanh Điệu (Tone Trainer)
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTabChange("pairs")}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all ${
-              activeTab === "pairs"
-                ? "bg-ink text-white shadow-sm"
-                : "border border-hairline bg-white text-ink-muted hover:border-ink/20 hover:text-ink"
-            }`}
-          >
-            <Headphones className="size-4 text-emerald-500" />
-            Phân Biệt Cặp Âm (Minimal Pairs)
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTabChange("lessons")}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all ${
-              activeTab === "lessons"
-                ? "bg-ink text-white shadow-sm"
-                : "border border-hairline bg-white text-ink-muted hover:border-ink/20 hover:text-ink"
-            }`}
-          >
-            <GraduationCap className="size-4 text-violet-500" />
-            10 Bài Học Phát Âm
-          </button>
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleTabChange(tab.id as typeof activeTab)}
+                  className={`group relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold transition-all duration-150 whitespace-nowrap active:scale-[0.98] ${
+                    isActive
+                      ? "bg-white text-ink shadow-xs border border-hairline/80"
+                      : "text-ink-muted hover:text-ink hover:bg-white/60"
+                  }`}
+                >
+                  <Icon
+                    className={`h-4 w-4 transition-colors ${
+                      isActive
+                        ? tab.activeIconColor
+                        : "text-ink-muted group-hover:text-ink"
+                    }`}
+                  />
+                  <span>{tab.label}</span>
+                  <span
+                    className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-tight transition-colors ${
+                      isActive
+                        ? tab.activeBadgeColor
+                        : "bg-black/5 text-ink-muted group-hover:text-ink"
+                    }`}
+                  >
+                    {tab.tag}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {activeTab === "table" && (
