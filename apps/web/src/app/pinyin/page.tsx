@@ -17,9 +17,16 @@ import {
   Volume2,
   ZoomIn,
   ZoomOut,
+  Grid3X3,
+  Activity,
+  Headphones,
+  GraduationCap,
 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { HanziStrokePanel } from "@/components/hanzi-stroke-player";
+import { ToneTrainer } from "@/components/pinyin/tone-trainer";
+import { SoundPairsQuiz } from "@/components/pinyin/sound-pairs-quiz";
+import { PinyinLessons } from "@/components/pinyin/pinyin-lessons";
 
 const FINALS = [
   { id: "a", label: "a" },
@@ -841,6 +848,9 @@ const BASE_PINYIN_TABLE_HEIGHT = Math.max(
 );
 
 export default function PinyinPage() {
+  const [activeTab, setActiveTab] = useState<
+    "table" | "tones" | "pairs" | "lessons"
+  >("table");
   const [selectedKey, setSelectedKey] = useState(DEFAULT_SYLLABLE.key);
   const [query, setQuery] = useState("");
   const [lastSpoken, setLastSpoken] = useState("");
@@ -852,6 +862,30 @@ export default function PinyinPage() {
   const [viewportSize, setViewportSize] = useState({ width: 1280, height: 900 });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playTokenRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (
+        tab === "tones" ||
+        tab === "pairs" ||
+        tab === "lessons" ||
+        tab === "table"
+      ) {
+        setActiveTab(tab);
+      }
+    }
+  }, []);
+
+  const handleTabChange = (tab: "table" | "tones" | "pairs" | "lessons") => {
+    setActiveTab(tab);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", tab);
+      window.history.pushState({}, "", url.toString());
+    }
+  };
 
   const selected =
     SYLLABLES.find((item) => item.key === selectedKey) ?? DEFAULT_SYLLABLE;
@@ -1031,7 +1065,64 @@ export default function PinyinPage() {
       <AppHeader />
 
       <section className="mx-auto max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="grid gap-5 border-b border-hairline pb-6 lg:grid-cols-[1fr_380px] lg:items-end">
+        {/* Navigation Tabs */}
+        <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-hairline pb-4">
+          <button
+            type="button"
+            onClick={() => handleTabChange("table")}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all ${
+              activeTab === "table"
+                ? "bg-ink text-white shadow-sm"
+                : "border border-hairline bg-white text-ink-muted hover:border-ink/20 hover:text-ink"
+            }`}
+          >
+            <Grid3X3 className="size-4" />
+            Bảng Pinyin Tra Cứu
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange("tones")}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all ${
+              activeTab === "tones"
+                ? "bg-ink text-white shadow-sm"
+                : "border border-hairline bg-white text-ink-muted hover:border-ink/20 hover:text-ink"
+            }`}
+          >
+            <Activity className="size-4 text-sky-500" />
+            Luyện Thanh Điệu (Tone Trainer)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange("pairs")}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all ${
+              activeTab === "pairs"
+                ? "bg-ink text-white shadow-sm"
+                : "border border-hairline bg-white text-ink-muted hover:border-ink/20 hover:text-ink"
+            }`}
+          >
+            <Headphones className="size-4 text-emerald-500" />
+            Phân Biệt Cặp Âm (Minimal Pairs)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleTabChange("lessons")}
+            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold transition-all ${
+              activeTab === "lessons"
+                ? "bg-ink text-white shadow-sm"
+                : "border border-hairline bg-white text-ink-muted hover:border-ink/20 hover:text-ink"
+            }`}
+          >
+            <GraduationCap className="size-4 text-violet-500" />
+            10 Bài Học Phát Âm
+          </button>
+        </div>
+
+        {activeTab === "table" && (
+          <>
+            <div className="grid gap-5 border-b border-hairline pb-6 lg:grid-cols-[1fr_380px] lg:items-end">
           <div>
             <h1 className="text-4xl font-bold tracking-[-1.2px] text-ink sm:text-5xl">
               Bảng Pinyin
@@ -1255,7 +1346,17 @@ export default function PinyinPage() {
             onSpeak={speak}
           />
         </div>
-      </section>
+      </>
+    )}
+
+    {activeTab === "tones" && <ToneTrainer />}
+
+    {activeTab === "pairs" && <SoundPairsQuiz />}
+
+    {activeTab === "lessons" && (
+      <PinyinLessons onSelectQuizDrill={() => handleTabChange("pairs")} />
+    )}
+  </section>
     </main>
   );
 }
