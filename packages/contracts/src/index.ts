@@ -29,6 +29,8 @@ export type DictationCurrentQuestion = {
   id: string;
   promptVi: string;
   audioText: string;
+  hanzi: string;
+  pinyin: string;
   wordBank: string[];
   targetSeconds: number;
   hint: string;

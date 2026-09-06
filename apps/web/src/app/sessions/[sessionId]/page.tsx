@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent,
 } from "react";
@@ -55,7 +56,8 @@ export default function SessionPage() {
   const [elapsed, setElapsed] = useState(0);
   const [startedAt, setStartedAt] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
+  const pendingAnswerRef = useRef<Promise<DictationAnswerResponse> | null>(null);
   const [nextRoadmapLesson, setNextRoadmapLesson] =
     useState<StudyPlanLesson | null>(null);
   const [openingRoadmapLesson, setOpeningRoadmapLesson] = useState(false);
@@ -179,7 +181,7 @@ export default function SessionPage() {
       : answer;
   }
 
-  async function submit() {
+  function submit() {
     if (!session?.currentQuestion || !token || review) return;
     const value = currentAnswer().trim();
 
@@ -188,32 +190,83 @@ export default function SessionPage() {
       return;
     }
 
-    setSubmitting(true);
-    setError("");
+    const question = session.currentQuestion;
+    const hanzi = question.hanzi || question.audioText;
+    const pinyin = question.pinyin || "";
 
-    try {
-      const result = await dictationApi.answer(
-        session.id,
-        {
-          questionId: session.currentQuestion.id,
-          answer: value,
-          elapsedMs: elapsed,
-        },
-        token,
-      );
-      setReview(result);
-      speak(result.answer.hanzi);
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Không thể chấm câu.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
+    const isCorrect =
+      normalizeHanzi(value) === normalizeHanzi(hanzi) ||
+      (pinyin ? normalizePinyin(value) === normalizePinyin(pinyin) : false);
+
+    const elapsedMs = elapsed;
+    const rawExpDelta = isCorrect
+      ? 10 + (elapsedMs < question.targetSeconds * 500 ? 5 : 0)
+      : -2;
+    const nextExp = Math.max(0, session.exp + rawExpDelta);
+    const expDelta = nextExp - session.exp;
+    const nextCombo = isCorrect ? session.combo + 1 : 0;
+    const completedQuestionCount = isCorrect
+      ? Math.min(session.questionCount, session.completedQuestionCount + 1)
+      : session.completedQuestionCount;
+    const isCompleted = isCorrect && completedQuestionCount >= session.questionCount;
+
+    const optimisticSession: DictationSessionResponse = {
+      ...session,
+      exp: nextExp,
+      combo: nextCombo,
+      maxCombo: Math.max(session.maxCombo, nextCombo),
+      correctCount: session.correctCount + (isCorrect ? 1 : 0),
+      mistakeCount: session.mistakeCount + (isCorrect ? 0 : 1),
+      completedQuestionCount,
+      status: isCompleted ? "COMPLETED" : session.status,
+    };
+
+    const optimisticReview: DictationAnswerResponse = {
+      correct: isCorrect,
+      expDelta,
+      answer: {
+        hanzi,
+        pinyin,
+        meaningVi: question.promptVi,
+      },
+      session: optimisticSession,
+    };
+
+    // 1. Phản hồi tức thì (0ms)
+    setError("");
+    setReview(optimisticReview);
+    speak(hanzi);
+
+    // 2. Chạy ngầm gọi API để lưu vào database
+    const answerPromise = dictationApi.answer(
+      session.id,
+      {
+        questionId: question.id,
+        answer: value,
+        elapsedMs,
+      },
+      token,
+    );
+
+    pendingAnswerRef.current = answerPromise;
+
+    answerPromise
+      .then((serverResult) => {
+        // Cập nhật lại session chính thức từ server (chứa câu hỏi tiếp theo)
+        setReview((prev) => (prev ? serverResult : null));
+      })
+      .catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Lỗi lưu câu trả lời vào máy chủ.",
+        );
+      });
   }
 
-  function next() {
+  async function next() {
     if (!review) return;
+
     if (!review.correct) {
       setSession(review.session);
       setReview(null);
@@ -223,7 +276,28 @@ export default function SessionPage() {
       return;
     }
 
-    setSession(review.session);
+    let finalSession = review.session;
+
+    if (pendingAnswerRef.current) {
+      setAdvancing(true);
+      try {
+        const serverResult = await pendingAnswerRef.current;
+        finalSession = serverResult.session;
+      } catch (caught) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Không thể tải câu hỏi tiếp theo.",
+        );
+        setAdvancing(false);
+        return;
+      } finally {
+        pendingAnswerRef.current = null;
+        setAdvancing(false);
+      }
+    }
+
+    setSession(finalSession);
     setReview(null);
     setAnswer("");
     setParts([]);
@@ -235,8 +309,8 @@ export default function SessionPage() {
   function handleKey(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    if (review) next();
-    else void submit();
+    if (review) void next();
+    else submit();
   }
 
   async function openRoadmapLesson(lesson: Pick<StudyPlanLesson, "id">) {
@@ -610,11 +684,11 @@ export default function SessionPage() {
               </button>
               <button
                 className="focus-ring inline-flex h-12 items-center justify-center gap-2 rounded-full bg-primary font-medium text-white transition hover:-translate-y-0.5 hover:bg-primary-active hover:shadow-lg active:translate-y-0 disabled:opacity-60"
-                disabled={submitting}
+                disabled={advancing}
                 type="button"
-                onClick={() => (review ? next() : void submit())}
+                onClick={() => (review ? void next() : submit())}
               >
-                {submitting ? (
+                {advancing ? (
                   <LoaderCircle className="size-4 animate-spin" />
                 ) : null}
                 {review ? (
@@ -667,6 +741,22 @@ function voiceLabel(voice: SpeechSynthesisVoice): string {
       .replace(/\s+/g, " ")
       .trim() || voice.lang
   );
+}
+
+function normalizeHanzi(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s，。！？、,.!?;:：；'"“”‘’()（）[\]{}-]/gu, "");
+}
+
+function normalizePinyin(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Mark}/gu, "")
+    .toLowerCase()
+    .replace(/[1-5]/g, "")
+    .replace(/[^a-z]/g, "");
 }
 
 function StudyStat({

@@ -213,8 +213,8 @@ export default function StrokesPage() {
         </div>
 
         <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {BASIC_STROKES.map((stroke, index) => (
-            <StrokeCard key={stroke.id} index={index + 1} stroke={stroke} />
+          {BASIC_STROKES.map((stroke) => (
+            <StrokeCard key={stroke.id} stroke={stroke} />
           ))}
         </section>
 
@@ -280,22 +280,13 @@ export default function StrokesPage() {
   );
 }
 
-function StrokeCard({
-  index,
-  stroke,
-}: {
-  index: number;
-  stroke: StrokeDefinition;
-}) {
+function StrokeCard({ stroke }: { stroke: StrokeDefinition }) {
   return (
     <article className="notion-shadow group overflow-hidden rounded-2xl border border-hairline bg-white">
       <div className="border-b border-hairline bg-canvas-soft p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
-              Nét {index}
-            </p>
-            <h2 className="mt-1 text-xl font-black tracking-[-0.5px] text-ink">
+            <h2 className="text-xl font-black tracking-[-0.5px] text-ink">
               {stroke.name}
             </h2>
           </div>

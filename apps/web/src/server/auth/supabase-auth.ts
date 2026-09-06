@@ -7,8 +7,8 @@ import {
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { ApiError } from "@/server/http-error";
 
-const TOKEN_CACHE_TTL_MS = 30_000;
-const TOKEN_CACHE_MAX_ENTRIES = 500;
+const TOKEN_CACHE_TTL_MS = 10 * 60_000;
+const TOKEN_CACHE_MAX_ENTRIES = 1000;
 
 type CachedAuthUser = {
   expiresAt: number;
@@ -27,6 +27,15 @@ export async function requireAuthUser(request: Request): Promise<AuthUser> {
   }
 
   return verifyAccessToken(accessToken);
+}
+
+function getJwtExpiresAtMs(accessToken: string): number | null {
+  const parts = accessToken.split(".");
+  if (parts.length < 2) return null;
+  const payload = parseJwtPart(parts[1]);
+  if (!isRecord(payload)) return null;
+  const exp = getNumericClaim(payload, "exp");
+  return exp ? exp * 1000 : null;
 }
 
 async function verifyAccessToken(accessToken: string): Promise<AuthUser> {
@@ -50,9 +59,13 @@ async function verifyAccessToken(accessToken: string): Promise<AuthUser> {
   )
     .then((user) => {
       pruneTokenCache();
+      const jwtExpMs = getJwtExpiresAtMs(accessToken);
+      const remainingMs = jwtExpMs ? jwtExpMs - Date.now() : TOKEN_CACHE_TTL_MS;
+      const ttlMs = Math.min(Math.max(remainingMs, 60_000), TOKEN_CACHE_TTL_MS);
+
       verifiedTokens.set(tokenKey, {
         user,
-        expiresAt: Date.now() + TOKEN_CACHE_TTL_MS,
+        expiresAt: Date.now() + ttlMs,
       });
 
       return user;

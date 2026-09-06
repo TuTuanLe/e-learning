@@ -161,14 +161,43 @@ function normalizePinyin(value: string): string {
     .replace(/[^a-z]/g, "");
 }
 
+type OwnedSessionWithPlan = Prisma.DictationSessionGetPayload<{
+  include: {
+    studyPlanLesson: {
+      select: {
+        id: true;
+        title: true;
+        week: {
+          select: {
+            studyPlan: { select: { hskLevel: true } };
+          };
+        };
+      };
+    };
+  };
+}>;
+
 async function findOwnedSession(
   userId: string,
   id: string,
-): Promise<DictationSession> {
+): Promise<OwnedSessionWithPlan> {
   const session = await prisma.dictationSession.findFirst({
     where: {
       id,
       userId,
+    },
+    include: {
+      studyPlanLesson: {
+        select: {
+          id: true,
+          title: true,
+          week: {
+            select: {
+              studyPlan: { select: { hskLevel: true } },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -202,6 +231,8 @@ function toSessionResponse(
         id: question.id,
         promptVi: question.promptVi,
         audioText: question.hanzi,
+        hanzi: question.hanzi,
+        pinyin: question.pinyin,
         wordBank: buildWordBank(question, session.id),
         targetSeconds: question.targetSeconds,
         hint: `Câu có ${Array.from(question.hanzi).filter((char) => /[\u3400-\u9fff]/u.test(char)).length} chữ Hán, bắt đầu bằng “${question.hanzi[0] ?? ""}”.`,
@@ -425,7 +456,7 @@ export const dictationService = {
 
     return toSessionResponse(
       session,
-      await getStudyPlanContext(session.studyPlanLessonId),
+      toStudyPlanContext(session.studyPlanLesson),
     );
   },
 
@@ -470,40 +501,72 @@ export const dictationService = {
     }
 
     const completed = completedQuestionIds.length >= unit.questions.length;
-    const nextSession = await prisma.$transaction(async (transaction) => {
-      await transaction.dictationAttempt.create({
-        data: {
-          sessionId: session.id,
-          questionId: question.id,
-          answer: submittedAnswer,
-          isCorrect: correct,
-          elapsedMs,
-          expDelta,
-        },
+    let nextSession: DictationSession;
+
+    if (!completed) {
+      const [, updatedSession] = await prisma.$transaction([
+        prisma.dictationAttempt.create({
+          data: {
+            sessionId: session.id,
+            questionId: question.id,
+            answer: submittedAnswer,
+            isCorrect: correct,
+            elapsedMs,
+            expDelta,
+          },
+        }),
+        prisma.dictationSession.update({
+          where: { id: session.id },
+          data: {
+            questionOrder,
+            completedQuestionIds,
+            currentIndex: session.currentIndex + (correct ? 1 : 0),
+            exp: nextExp,
+            combo: nextCombo,
+            maxCombo: Math.max(session.maxCombo, nextCombo),
+            correctCount: session.correctCount + (correct ? 1 : 0),
+            mistakeCount: session.mistakeCount + (correct ? 0 : 1),
+            status: "ACTIVE",
+          },
+        }),
+      ]);
+      nextSession = updatedSession;
+    } else {
+      nextSession = await prisma.$transaction(async (transaction) => {
+        await transaction.dictationAttempt.create({
+          data: {
+            sessionId: session.id,
+            questionId: question.id,
+            answer: submittedAnswer,
+            isCorrect: correct,
+            elapsedMs,
+            expDelta,
+          },
+        });
+
+        const updatedSession = await transaction.dictationSession.update({
+          where: { id: session.id },
+          data: {
+            questionOrder,
+            completedQuestionIds,
+            currentIndex: session.currentIndex + (correct ? 1 : 0),
+            exp: nextExp,
+            combo: nextCombo,
+            maxCombo: Math.max(session.maxCombo, nextCombo),
+            correctCount: session.correctCount + (correct ? 1 : 0),
+            mistakeCount: session.mistakeCount + (correct ? 0 : 1),
+            status: "COMPLETED",
+            completedAt: new Date(),
+          },
+        });
+
+        if (session.studyPlanLessonId) {
+          await completeStudyPlanLesson(transaction, session.studyPlanLessonId);
+        }
+
+        return updatedSession;
       });
-
-      const updatedSession = await transaction.dictationSession.update({
-        where: { id: session.id },
-        data: {
-          questionOrder,
-          completedQuestionIds,
-          currentIndex: session.currentIndex + (correct ? 1 : 0),
-          exp: nextExp,
-          combo: nextCombo,
-          maxCombo: Math.max(session.maxCombo, nextCombo),
-          correctCount: session.correctCount + (correct ? 1 : 0),
-          mistakeCount: session.mistakeCount + (correct ? 0 : 1),
-          status: completed ? "COMPLETED" : "ACTIVE",
-          completedAt: completed ? new Date() : null,
-        },
-      });
-
-      if (completed && session.studyPlanLessonId) {
-        await completeStudyPlanLesson(transaction, session.studyPlanLessonId);
-      }
-
-      return updatedSession;
-    });
+    }
 
     return {
       correct,
@@ -515,7 +578,7 @@ export const dictationService = {
       },
       session: toSessionResponse(
         nextSession,
-        await getStudyPlanContext(nextSession.studyPlanLessonId),
+        toStudyPlanContext(session.studyPlanLesson),
       ),
     };
   },
