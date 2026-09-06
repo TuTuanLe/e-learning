@@ -39,8 +39,45 @@ async function request<T>(
   return payload as T;
 }
 
+let catalogCache: DictationCatalogResponse | null = null;
+
+function getStoredCatalog(): DictationCatalogResponse | null {
+  if (catalogCache) return catalogCache;
+  if (typeof window !== "undefined") {
+    try {
+      const stored = sessionStorage.getItem("dictation:catalog:v1");
+      if (stored) {
+        catalogCache = JSON.parse(stored) as DictationCatalogResponse;
+        return catalogCache;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
+function setStoredCatalog(data: DictationCatalogResponse): void {
+  catalogCache = data;
+  if (typeof window !== "undefined") {
+    try {
+      sessionStorage.setItem("dictation:catalog:v1", JSON.stringify(data));
+    } catch {
+      // ignore
+    }
+  }
+}
+
 export const dictationApi = {
-  catalog: () => request<DictationCatalogResponse>("/dictation/catalog"),
+  getCachedCatalog: () => getStoredCatalog(),
+  setCachedCatalog: (catalog: DictationCatalogResponse) => setStoredCatalog(catalog),
+  catalog: async () => {
+    const cached = getStoredCatalog();
+    if (cached) return cached;
+    const data = await request<DictationCatalogResponse>("/dictation/catalog");
+    setStoredCatalog(data);
+    return data;
+  },
   sessions: (token: string) =>
     request<DictationSessionListResponse>("/dictation/sessions", {}, token),
   createSession: (payload: CreateDictationSessionRequest, token: string) =>

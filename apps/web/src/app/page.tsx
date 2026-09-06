@@ -65,7 +65,9 @@ const modeOptions: Array<{
 export default function HomePage() {
   const router = useRouter();
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
-  const [catalog, setCatalog] = useState<DictationCatalogResponse | null>(null);
+  const [catalog, setCatalog] = useState<DictationCatalogResponse | null>(() =>
+    dictationApi.getCachedCatalog(),
+  );
   const [sessions, setSessions] = useState<DictationSessionResponse[]>([]);
   const [subscription, setSubscription] = useState<SubscriptionSummary | null>(
     null,
@@ -73,11 +75,17 @@ export default function HomePage() {
   const [activeRoadmap, setActiveRoadmap] = useState<StudyPlanResponse | null>(
     null,
   );
-  const [collectionId, setCollectionId] = useState("");
-  const [unitId, setUnitId] = useState("");
+  const [collectionId, setCollectionId] = useState(
+    () => dictationApi.getCachedCatalog()?.collections[0]?.id ?? "",
+  );
+  const [unitId, setUnitId] = useState(
+    () => dictationApi.getCachedCatalog()?.collections[0]?.units[0]?.id ?? "",
+  );
   const [topic, setTopic] = useState("Tất cả");
   const [mode, setMode] = useState<DictationMode>("TYPING");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(
+    () => !dictationApi.getCachedCatalog(),
+  );
   const [starting, setStarting] = useState(false);
   const [startingRoadmap, setStartingRoadmap] = useState(false);
   const [error, setError] = useState("");
@@ -121,8 +129,12 @@ export default function HomePage() {
         if (!mounted) return;
 
         setCatalog(nextCatalog);
-        setCollectionId(nextCatalog.collections[0]?.id ?? "");
-        setUnitId(nextCatalog.collections[0]?.units[0]?.id ?? "");
+        setCollectionId(
+          (curr) => curr || (nextCatalog.collections[0]?.id ?? ""),
+        );
+        setUnitId(
+          (curr) => curr || (nextCatalog.collections[0]?.units[0]?.id ?? ""),
+        );
       } catch (caught) {
         setError(
           caught instanceof Error ? caught.message : "Không thể tải nội dung.",
