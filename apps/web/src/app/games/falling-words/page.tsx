@@ -6,6 +6,7 @@ import {
   useRef,
   useCallback,
   useMemo,
+  Suspense,
   type KeyboardEvent,
 } from "react";
 import Link from "next/link";
@@ -74,6 +75,23 @@ interface BurstEffect {
 }
 
 export default function FallingWordsGamePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-white">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-rose-500 border-t-transparent" />
+            <p className="text-xs text-zinc-400">Đang tải đấu trường Phi Đao...</p>
+          </div>
+        </div>
+      }
+    >
+      <FallingWordsGameContent />
+    </Suspense>
+  );
+}
+
+function FallingWordsGameContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
